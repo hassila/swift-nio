@@ -15,6 +15,7 @@
 import NIOConcurrencyHelpers
 
 private enum SelectorLifecycleState {
+    case initializing
     case open
     case closing
     case closed
@@ -126,6 +127,30 @@ private struct EpollFilterSet: OptionSet, Equatable {
     }
 }
 
+/// Represents the `poll` filters/events we might use from io_uring:
+///
+///  - `hangup` corresponds to `POLLHUP`
+///  - `readHangup` corresponds to `POLLRDHUP`
+///  - `input` corresponds to `POLLIN`
+///  - `output` corresponds to `POLLOUT`
+///  - `error` corresponds to `POLLERR`
+private struct UringFilterSet: OptionSet, Equatable {
+    typealias RawValue = UInt8
+
+    let rawValue: RawValue
+
+    static let _none = UringFilterSet([])
+    static let hangup = UringFilterSet(rawValue: 1 << 0)
+    static let readHangup = UringFilterSet(rawValue: 1 << 1)
+    static let input = UringFilterSet(rawValue: 1 << 2)
+    static let output = UringFilterSet(rawValue: 1 << 3)
+    static let error = UringFilterSet(rawValue: 1 << 4)
+
+    init(rawValue: RawValue) {
+        self.rawValue = rawValue
+    }
+}
+
 internal let isEarlyEOFDeliveryWorkingOnThisOS: Bool = {
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
     return false // rdar://53656794 , once fixed we need to do an OS version check here.
@@ -208,6 +233,23 @@ extension EpollFilterSet {
     }
 }
 
+extension UringFilterSet {
+    /// Convert NIO's `SelectorEventSet` set to a `UringFilterSet`
+    init(selectorEventSet: SelectorEventSet) {
+        var thing: UringFilterSet = [.error, .hangup]
+        if selectorEventSet.contains(.read) {
+            thing.formUnion(.input)
+        }
+        if selectorEventSet.contains(.write) {
+            thing.formUnion(.output)
+        }
+        if selectorEventSet.contains(.readEOF) {
+            thing.formUnion(.readHangup)
+        }
+        self = thing
+    }
+}
+
 #if os(Linux) || os(Android)
     extension SelectorEventSet {
         var epollEventSet: UInt32 {
@@ -248,37 +290,78 @@ extension EpollFilterSet {
     }
 #endif
 
+#if os(Linux) || os(Android)
+    extension SelectorEventSet {
+        var uringEventSet: UInt32 {
+            assert(self != ._none)
+            // POLLERR | POLLHUP is always set unconditionally anyway but it's easier to understand if we explicitly ask.
+            var filter: UInt32 = Uring.POLLERR | Uring.POLLHUP
+            let uringFilters = UringFilterSet(selectorEventSet: self)
+            if uringFilters.contains(.input) {
+                filter |= Uring.POLLIN
+            }
+            if uringFilters.contains(.output) {
+                filter |= Uring.POLLOUT
+            }
+            if uringFilters.contains(.readHangup) {
+                filter |= Uring.POLLRDHUP
+            }
+            assert(filter & Uring.POLLHUP != 0) // both of these are reported
+            assert(filter & Uring.POLLERR != 0) // always and can't be masked.
+            return filter
+        }
+        
+
+        fileprivate init(uringEvent: UInt32) {
+            var selectorEventSet: SelectorEventSet = ._none
+            if uringEvent & Uring.POLLIN != 0 {
+                selectorEventSet.formUnion(.read)
+            }
+            if uringEvent & Uring.POLLOUT != 0 {
+                selectorEventSet.formUnion(.write)
+            }
+            if uringEvent & Uring.POLLRDHUP != 0 {
+                selectorEventSet.formUnion(.readEOF)
+            }
+            if uringEvent & Uring.POLLHUP != 0 || uringEvent & Uring.POLLERR != 0 {
+                selectorEventSet.formUnion(.reset)
+            }
+            self = selectorEventSet
+        }
+         
+    }
+#endif
 
 ///  A `Selector` allows a user to register different `Selectable` sources to an underlying OS selector, and for that selector to notify them once IO is ready for them to process.
 ///
 /// This implementation offers an consistent API over epoll (for linux) and kqueue (for Darwin, BSD).
 /* this is deliberately not thread-safe, only the wakeup() function may be called unprotectedly */
 internal class Selector<R: Registration> {
-    private var lifecycleState: SelectorLifecycleState
+    fileprivate var lifecycleState: SelectorLifecycleState = .initializing
 
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    private typealias EventType = kevent
+    fileprivate typealias EventType = kevent
     #else
-    private typealias EventType = Epoll.epoll_event
-    private var earliestTimer: NIODeadline = .distantFuture
+    fileprivate typealias EventType = Epoll.epoll_event
+    fileprivate var earliestTimer: NIODeadline = .distantFuture
     #endif
 
-    private var eventsCapacity = 64
-    private var events: UnsafeMutablePointer<EventType>
-    private var registrations = [Int: R]()
+    fileprivate var eventsCapacity = 64
+    fileprivate var events: UnsafeMutablePointer<EventType>
+    fileprivate var registrations = [Int: R]()
     // temporary workaround to stop us delivering outdated events; read in `whenReady`, set in `deregister`
-    private var deregistrationsHappened: Bool = false
+    fileprivate var deregistrationsHappened: Bool = false
 
-    private let externalSelectorFDLock = Lock()
+    fileprivate let externalSelectorFDLock = Lock()
     // The rules for `self.selectorFD`, `self.eventFD`, and `self.timerFD`:
     // reads: `self.externalSelectorFDLock` OR access from the EventLoop thread
     // writes: `self.externalSelectorFDLock` AND access from the EventLoop thread
-    private var selectorFD: CInt // -1 == we're closed
+    fileprivate var selectorFD: CInt = -1 // -1 == we're closed
     #if os(Linux) || os(Android)
-    private var eventFD: CInt // -1 == we're closed
-    private var timerFD: CInt // -1 == we're closed
+    fileprivate var eventFD: CInt = -1 // -1 == we're closed
+    fileprivate var timerFD: CInt = -1 // -1 == we're closed
     #endif
-    private let myThread: NIOThread
+    fileprivate let myThread: NIOThread
 
     private static func allocateEventsArray(capacity: Int) -> UnsafeMutablePointer<EventType> {
         let events: UnsafeMutablePointer<EventType> = UnsafeMutablePointer.allocate(capacity: capacity)
@@ -301,7 +384,7 @@ internal class Selector<R: Registration> {
         }
     }
 
-    private func growEventArrayIfNeeded(ready: Int) {
+    fileprivate func growEventArrayIfNeeded(ready: Int) {
         assert(self.myThread == NIOThread.current)
         guard ready == eventsCapacity else {
             return
@@ -312,12 +395,20 @@ internal class Selector<R: Registration> {
         eventsCapacity = ready << 1
         events = Selector.allocateEventsArray(capacity: eventsCapacity)
     }
-
-    init() throws {
+    
+    // convenience initializer
+    convenience init() throws {
+        try self.init(sharedInitializationOnly: false)
+    }
+    
+    init(sharedInitializationOnly: Bool) throws {
         self.myThread = NIOThread.current
         events = Selector.allocateEventsArray(capacity: eventsCapacity)
         self.lifecycleState = .closed
-
+        if (sharedInitializationOnly) // for URing, we break out here
+        {
+            return
+        }
 #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
         self.selectorFD = try KQueue.kqueue()
         self.lifecycleState = .open
@@ -701,6 +792,184 @@ internal class Selector<R: Registration> {
             #endif
         }
     }
+}
+
+
+final internal class URingSelector<R: Registration>: Selector<R> {
+#if os(Linux)
+    private typealias EventType = Uring
+
+    var ring = Uring()
+    
+    override init(sharedInitializationOnly: Bool) throws {
+        try super.init(sharedInitializationOnly: true)
+        
+        try ring.io_uring_queue_init()
+
+        self.selectorFD = ring.fd()
+        self.eventFD = try EventFd.eventfd(initval: 0, flags: Int32(EventFd.EFD_CLOEXEC | EventFd.EFD_NONBLOCK))
+        self.lifecycleState = .open
+
+        try ring.io_uring_register_eventfd(fd:self.eventFD)
+    }
+    /// Register `Selectable` on the `Selector`.
+    ///
+    /// - parameters:
+    ///     - selectable: The `Selectable` to register.
+    ///     - interested: The `SelectorEventSet` in which we are interested and want to be notified about.
+    ///     - makeRegistration: Creates the registration data for the given `SelectorEventSet`.
+    override func register<S: Selectable>(selectable: S, interested: SelectorEventSet, makeRegistration: (SelectorEventSet) -> R) throws {
+        assert(self.myThread == NIOThread.current)
+        assert(interested.contains(.reset))
+        guard self.lifecycleState == .open else {
+            throw IOError(errnoCode: EBADF, reason: "can't register on selector as it's \(self.lifecycleState).")
+        }
+
+        try selectable.withUnsafeHandle { fd in
+            assert(registrations[Int(fd)] == nil)
+            
+            ring.io_uring_prep_poll_add(fd: fd, poll_mask: interested.uringEventSet)
+
+            registrations[Int(fd)] = makeRegistration(interested)
+        }
+    }
+
+    /// Re-register `Selectable`, must be registered via `register` before.
+    ///
+    /// - parameters:
+    ///     - selectable: The `Selectable` to re-register.
+    ///     - interested: The `SelectorEventSet` in which we are interested and want to be notified about.
+    override func reregister<S: Selectable>(selectable: S, interested: SelectorEventSet) throws {
+        assert(self.myThread == NIOThread.current)
+        guard self.lifecycleState == .open else {
+            throw IOError(errnoCode: EBADF, reason: "can't re-register on selector as it's \(self.lifecycleState).")
+        }
+        assert(interested.contains(.reset), "must register for at least .reset but tried registering for \(interested)")
+        try selectable.withUnsafeHandle { fd in
+            var reg = registrations[Int(fd)]!
+
+            ring.io_uring_prep_poll_add(fd: fd, poll_mask: interested.uringEventSet)
+
+            reg.interested = interested
+            registrations[Int(fd)] = reg
+        }
+    }
+ 
+
+
+/// Deregister `Selectable`, must be registered via `register` before.
+///
+/// After the `Selectable is deregistered no `SelectorEventSet` will be produced anymore for the `Selectable`.
+///
+/// - parameters:
+///     - selectable: The `Selectable` to deregister.
+override func deregister<S: Selectable>(selectable: S) throws {
+    /* NOP right now
+    assert(self.myThread == NIOThread.current)
+    guard self.lifecycleState == .open else {
+        throw IOError(errnoCode: EBADF, reason: "can't deregister from selector as it's \(self.lifecycleState).")
+    }
+    // temporary workaround to stop us delivering outdated events
+    self.deregistrationsHappened = true
+    try selectable.withUnsafeHandle { fd in
+        guard let reg = registrations.removeValue(forKey: Int(fd)) else {
+            return
+        }
+        ring.io_uring_prep_poll_remove(fd: fd, poll_mask: interested.uringEventSet)
+
+         var ev = Epoll.epoll_event()
+         _ = try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_DEL, fd: fd, event: &ev)
+    }*/
+}
+
+
+    /// Apply the given `SelectorStrategy` and execute `body` once it's complete (which may produce `SelectorEvent`s to handle).
+    ///
+    /// - parameters:
+    ///     - strategy: The `SelectorStrategy` to apply
+    ///     - body: The function to execute for each `SelectorEvent` that was produced.
+    override func whenReady(strategy: SelectorStrategy, _ body: (SelectorEvent<R>) throws -> Void) throws -> Void {
+        assert(self.myThread == NIOThread.current)
+        guard self.lifecycleState == .open else {
+            throw IOError(errnoCode: EBADF, reason: "can't call whenReady for selector as it's \(self.lifecycleState).")
+        }
+
+        var ready: Int = 0
+        var fds: [(Int32, UInt32)] = [] // fd, poll_mask
+        
+        switch strategy {
+        case .now:
+//            print("io_uring_peek_batch_cqe")
+            ready = Int(ring.io_uring_peek_batch_cqe(events: &fds))
+        case .blockUntilTimeout(let timeAmount):
+//            print("io_uring_wait_cqe_timeout \(timeAmount)")
+            ready = try Int(ring.io_uring_wait_cqe_timeout(events: &fds, timeout:timeAmount)) // first try to consume any existing
+        case .block:
+//            print("io_uring_peek_batch_cqe block")
+            ready = Int(ring.io_uring_peek_batch_cqe(events: &fds)) // first try to consume any existing
+            
+            while (ready < 0)   // otherwise block (only single supported, but we will empty cqe next run around...
+            {
+                ready = try ring.io_uring_wait_cqe(events: &fds)
+            }
+        }
+        if (ready > 0)
+        {
+//            print("fds: \(fds)")
+        }
+        // start with no deregistrations happened
+        self.deregistrationsHappened = false
+        // temporary workaround to stop us delivering outdated events; possibly set in `deregister`
+//        for i in 0..<ready where !self.deregistrationsHappened {
+        for f in fds where !self.deregistrationsHappened {
+            let fd = f.0
+            let poll_mask = f.1
+            switch fd {
+/*            case Int32(self.eventFD):
+                var val = EventFd.eventfd_t()
+                // Consume event
+                _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val)
+  */          default:
+                // If the registration is not in the Map anymore we deregistered it during the processing of whenReady(...). In this case just skip it.
+                if let registration = registrations[Int(fd)] {
+                    var selectorEvent = SelectorEventSet(uringEvent: poll_mask)
+//                    var selectorEvent = SelectorEventSet.read
+                    // we can only verify the events for i == 0 as for i > 0 the user might have changed the registrations since then.
+//                    assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
+
+                    // in any case we only want what the user is currently registered for & what we got
+                    selectorEvent = selectorEvent.intersection(registration.interested)
+
+                    guard selectorEvent != ._none else {
+                        continue
+                    }
+  //                  print("uring event for fd \(fd) \(poll_mask)")
+                    try body((SelectorEvent(io: selectorEvent, registration: registration)))
+                }
+            }
+        }
+        growEventArrayIfNeeded(ready: ready)
+    }
+
+    /// Close the `Selector`.
+    ///
+    /// After closing the `Selector` it's no longer possible to use it.
+    override public func close() throws {
+        return try super.close()
+    }
+
+    /* attention, this may (will!) be called from outside the event loop, ie. can't access mutable shared state (such as `self.open`) */
+    override func wakeup() throws {
+        assert(NIOThread.current != self.myThread)
+        try self.externalSelectorFDLock.withLock {
+                guard self.eventFD >= 0 else {
+                    throw EventLoopError.shutdown
+                }
+                _ = try EventFd.eventfd_write(fd: self.eventFD, value: 1)
+        }
+    }
+ 
+#endif // os(Linux)
 }
 
 extension Selector: CustomStringConvertible {

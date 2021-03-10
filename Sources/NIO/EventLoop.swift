@@ -14,6 +14,7 @@
 
 import NIOConcurrencyHelpers
 import Dispatch
+import CNIOLinux
 
 /// Returned once a task was scheduled on the `EventLoop` for later execution.
 ///
@@ -867,6 +868,18 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
     private let shutdownLock: Lock = Lock()
     private var runState: RunState = .running
 
+    private static func selectorFactory() throws -> NIO.Selector<NIORegistration>
+    {
+        #if os(Linux)
+        do {
+            try Uring.io_uring_load()
+            return try NIO.URingSelector<NIORegistration>.init()
+        } catch  {
+        }
+        #endif
+        return try NIO.Selector<NIORegistration>.init()
+    }
+    
     private static func runTheLoop(thread: NIOThread,
                                    canEventLoopBeShutdownIndividually: Bool,
                                    selectorFactory: @escaping () throws -> NIO.Selector<NIORegistration>,
@@ -928,7 +941,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
     /// - arguments:
     ///     - numberOfThreads: The number of `Threads` to use.
     public convenience init(numberOfThreads: Int) {
-        self.init(numberOfThreads: numberOfThreads, selectorFactory: NIO.Selector<NIORegistration>.init)
+        self.init(numberOfThreads: numberOfThreads, selectorFactory: MultiThreadedEventLoopGroup.selectorFactory)
     }
 
     internal convenience init(numberOfThreads: Int,
@@ -1086,7 +1099,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
         let callingThread = NIOThread.current
         MultiThreadedEventLoopGroup.runTheLoop(thread: callingThread,
                                                canEventLoopBeShutdownIndividually: true,
-                                               selectorFactory: NIO.Selector<NIORegistration>.init,
+                                               selectorFactory: MultiThreadedEventLoopGroup.selectorFactory,
                                                initializer: { _ in }) { loop in
             loop.assertInEventLoop()
             callback(loop)
