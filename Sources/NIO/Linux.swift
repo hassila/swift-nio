@@ -159,6 +159,15 @@ extension BinaryInteger {
     var hexa: String { .init(self, radix: 16) }
 }
 
+extension TimeAmount {
+    public func kernelTimespec() -> __kernel_timespec {
+        var ts = __kernel_timespec()
+        ts.tv_sec = self.nanoseconds / 1_000_000_000
+        ts.tv_nsec = self.nanoseconds % 1_000_000_000
+        return ts
+    }
+}
+
 public class Uring {
     private var ring = io_uring()
     private let ring_entries: CUnsignedInt = 4096
@@ -170,7 +179,7 @@ public class Uring {
     public static let POLLRDHUP: CUnsignedInt = numericCast(CNIOLinux.EPOLLRDHUP.rawValue) // FIXME: - POLLRDHUP not available on ubuntu headers?!
     public static let POLLHUP: CUnsignedInt = numericCast(CNIOLinux.POLLHUP)
 
-    let cqeCount = 10
+    let cqeCount = 10000
     var cqes : UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>
     var emptyCqe = io_uring_cqe()
     
@@ -221,6 +230,8 @@ public class Uring {
         // IORING_SETUP_SQPOLL_PERCPU which together with IORING_SETUP_SQ_AFF will be possible to use to
         // bind the kernel poller thread to a given cpu (and share one amongst all rings) - not yet in
         // the kernel and work in progress, but sounds like it would be a better fit and worth trying.
+        // Alternatively we could look at limiting number of threads created to numcpu / 2 or so
+        // instead of starting one thread per core in the multithreaded event loop
         if (CNIOLinux.CNIOLinux_io_uring_queue_init(ring_entries, &ring, 0 ) != 0) // IORING_SETUP_IOPOLL | IORING_SETUP_SQPOLL
         
          {
@@ -285,62 +296,57 @@ public class Uring {
     }
 
     func _debugPrint(_ string : String) -> ()  {
-        print(string)
+//        print(string)
     }
     
     @inline(never)
     public func io_uring_peek_batch_cqe(events: inout [(Int32, UInt32)]) -> Int {
-print("io_uring_peek_batch_cqe")
+// print("io_uring_peek_batch_cqe")
         var fdEvents = [Int32: (UInt32, UInt32)]() // fd : original_poll_mask, event_poll_return
-print("io_uring_peek_batch_cqe2")
+// print("io_uring_peek_batch_cqe2")
         let currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, UInt32(cqeCount));
-        print("io_uring_peek_batch_cqe211")
+//        print("io_uring_peek_batch_cqe211")
 
-        if (currentCqeCount > 0) {
-            dumpCqes("io_uring_peek_batch_cqe res0 [\(UInt32(cqes[0]!.pointee.res))]")
-        }
-        print("io_uring_peek_batch_cqe212")
+//        if (currentCqeCount > 0) {
+//            dumpCqes("io_uring_peek_batch_cqe res0 [\(UInt32(cqes[0]!.pointee.res))]")
+//        }
+//        print("io_uring_peek_batch_cqe212 currentCqeCount \(currentCqeCount)")
 
         for i in 0 ..< currentCqeCount
         {
-            print("io_uring_peek_batch_cqe213")
+//            print("io_uring_peek_batch_cqe213")
 
-            let dataPointer = cqes[Int(i)]
-            print("io_uring_peek_batch_cqe21")
-            let result = cqes[Int(i)]!.pointee.res
-            print("io_uring_peek_batch_cqe22")
-            if (result > 0) {
+            let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[Int(i)]))
+//            print("io_uring_peek_batch_cqe22")
 
-                let dp = io_uring_cqe_get_data(dataPointer)
-                let bitPattern : UInt = UInt(bitPattern:dp)
+            if bitPattern > 0 {
                 let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
                 let poll_mask = UInt32(bitPattern >> 32) // shift out the fd
-                
-                _debugPrint("io_uring_peek_batch_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] i[\(i)] poll_mask[\(poll_mask)] currentCqeCount[\(currentCqeCount)] dp[\(String(describing:dp))] dataPointer[\(String(describing:dataPointer))] cqes[Int(i)][\(String(describing:cqes[Int(i)]))] cqes[\(String(describing:cqes))]")
+                let result = cqes[Int(i)]!.pointee.res
 
-                if (result >= 0)
-                {
+                if (result > 0) {
+                    _debugPrint("io_uring_peek_batch_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] i[\(i)] poll_mask[\(poll_mask)] currentCqeCount[\(currentCqeCount)]")
+
                     let uresult = UInt32(result)
                     if let current = fdEvents[fd] {
                         _debugPrint("masking in \(current), (\(poll_mask), \(result))")
                         fdEvents[fd] = ((current.0 | poll_mask), (current.1 | uresult))
                         _debugPrint("masked in \(fdEvents[fd])")
-                    } else
-                    {
+                    } else {
                         fdEvents[fd] = (poll_mask, uresult)
                     }
+                    _debugPrint("result is \(result) \(fdEvents[fd])")
                 }
-
-                _debugPrint("result is \(result) \(fdEvents[fd])")
-                CNIOLinux.io_uring_cqe_seen(&ring, dataPointer)
-                withUnsafeMutablePointer( to: &emptyCqe) { cqes[Int(i)] = $0 }
-
-            } else
-            {
-                CNIOLinux.io_uring_cqe_seen(&ring, dataPointer)
-                withUnsafeMutablePointer( to: &emptyCqe) { cqes[Int(i)] = $0 }
-                _debugPrint("zero or negative return, result is \(result)")
+                else
+               {
+                   _debugPrint("zero or negative return, result is \(result)")
+               }
             }
+            else {
+               _debugPrint("io_uring_peek_batch_cqe zero bitPattern - wakeup")
+               }
+            CNIOLinux.io_uring_cqe_seen(&ring, cqes[Int(i)])
+
         }
 
         if (currentCqeCount > 5)
@@ -355,24 +361,25 @@ print("io_uring_peek_batch_cqe2")
         for (fd, (poll_mask, result_mask)) in fdEvents {
             _debugPrint("append (\(fd),\(result_mask)) reregister \(poll_mask)")
             let socketClosing = (result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
-            _debugPrint("1111111")
+//            _debugPrint("1111111")
 
             if (socketClosing == false) {
-                _debugPrint("222222")
+//                _debugPrint("222222")
                 self._io_uring_prep_poll_add_prep(fd: fd, poll_mask: poll_mask) // requires an io_uring_submit later
-                _debugPrint("333333")
+//                _debugPrint("333333")
             } else
             {
-                _debugPrint("444444")
+//                _debugPrint("444444")
                 _debugPrint("socket is going down \((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))")
-                _debugPrint("555555")
+//                _debugPrint("555555")
             }
-            _debugPrint("6666666")
+//            _debugPrint("6666666")
             events.append((fd, result_mask))
-            _debugPrint("777777")
+//            _debugPrint("777777")
         }
+        /// FIXME: only submit if we actually did any poll add prep!!
         CNIOLinux_io_uring_submit(&ring)
-print("events.count \(events.count)")
+_debugPrint("events.count \(events.count)")
         return events.count
     }
 
@@ -386,35 +393,41 @@ print("events.count \(events.count)")
         {
             dumpCqes("io_uring_wait_cqe")
             let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[0]))
-            let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
-            let poll_mask = UInt32(bitPattern >> 32) // shift out the fd
-            _debugPrint("io_uring_wait_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] poll_mask[\(poll_mask)]")
-            events.append((fd, UInt32(cqes[0]!.pointee.res)))
-            CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
-            self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask)
-            withUnsafeMutablePointer( to: &emptyCqe) { cqes[0] = $0 }
+            if bitPattern > 0 {
+                let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
+                let poll_mask = UInt32(bitPattern >> 32) // shift out the fd
+                let result = cqes[0]!.pointee.res
+                if (result > 0) {
 
+                _debugPrint("io_uring_wait_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] poll_mask[\(poll_mask)] cqes[0][\(String(describing:cqes[0]))] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                events.append((fd, UInt32(cqes[0]!.pointee.res)))
+                self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask)
+            } else
+            {
+                _debugPrint("io_uring_wait_cqe result [\(result)]")
+            }
+            } else
+            {
+                _debugPrint("io_uring_wait_cqe zero bitPattern - wakeup")
+            }
+
+            CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
         }
         else
         {
-            _debugPrint("\(error)")
+            _debugPrint("UringError.uringWaitCqeFailure \(error)")
             throw UringError.uringWaitCqeFailure
         }
         
-//        cqes.initialize(repeating:&emptyCqe, count:cqeCount)
-//        dumpCqes("cqes.initialize")
-
-        return 1
+        return events.count
     }
 
     @inline(never)
     public func io_uring_wait_cqe_timeout(events: inout [(Int32, UInt32)], timeout: TimeAmount) throws -> Int {
-        _debugPrint("io_uring_wait_cqe_timeout")
-        var ts = __kernel_timespec()
-        ts.tv_sec = 0
-        ts.tv_nsec = timeout.nanoseconds
+        var ts = timeout.kernelTimespec()
 //        _debugPrint("io_uring_wait_cqe_timeout before cqes[0][\(String(describing:cqes[0]))]")
 //        dumpCqes("io_uring_wait_cqe_timeout before")
+        _debugPrint("-io_uring_wait_cqe_timeout.ETIME milliseconds \(ts)")
 
         let error = CNIOLinux_io_uring_wait_cqe_timeout(&ring, cqes, &ts)
 
@@ -422,25 +435,27 @@ print("events.count \(events.count)")
             case 0:
                 dumpCqes("io_uring_wait_cqe_timeout")
                 let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[0]))
-                let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
-                let poll_mask = UInt32(bitPattern >> 32) // shift out the fd
-                let result = cqes[0]!.pointee.res
-                if (result > 0) {
+                if bitPattern > 0 {
+                    let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
+                    let poll_mask = UInt32(bitPattern >> 32) // shift out the fd
+                    let result = cqes[0]!.pointee.res
+                    if (result > 0) {
 
-                    _debugPrint("io_uring_wait_cqe_timeout bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] poll_mask[\(poll_mask)] cqes[0][\(String(describing:cqes[0]))] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
-                    events.append((fd, UInt32(cqes[0]!.pointee.res)))
-                    self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask)
+                        _debugPrint("io_uring_wait_cqe_timeout bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] poll_mask[\(poll_mask)] cqes[0][\(String(describing:cqes[0]))] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                        events.append((fd, UInt32(cqes[0]!.pointee.res)))
+                        self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask)
+                    } else
+                    {
+                        _debugPrint("io_uring_wait_cqe_timeout result [\(result)]")
+                    }
                 } else
                 {
-                    _debugPrint("io_uring_wait_cqe_timeout result [\(result)]")
+                    _debugPrint("io_uring_wait_cqe_timeout zero bitPattern - wakeup")
                 }
                 CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
 
-                withUnsafeMutablePointer( to: &emptyCqe) { cqes[0] = $0 }
-
             case -CNIOLinux.ETIME: // timed out
                 _debugPrint("-CNIOLinux.ETIME")
-                withUnsafeMutablePointer( to: &emptyCqe) { cqes[0] = $0 }
                 CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
                 return 0
             default:
@@ -450,11 +465,17 @@ print("events.count \(events.count)")
 //        cqes.initialize(repeating:&emptyCqe, count:cqeCount)
 //        dumpCqes("cqes.initialize")
 
-        return 1
+        return events.count
     }
 
     @inline(never)
     public func io_uring_wakeup() -> () {
+//        print("wakeup ring \(ring)")
+        let sqe = CNIOLinux_io_uring_get_sqe(&ring)
+        let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(0)) // we just use 0 user data as wakeup NOP op
+        CNIOLinux.io_uring_prep_nop(sqe)
+        CNIOLinux.io_uring_sqe_set_data(sqe, bitpatternAsPointer) // must be done after io_uring_prep_nop, otherwise zeroed out.
+        CNIOLinux_io_uring_submit(&ring)
         return
     }
 }

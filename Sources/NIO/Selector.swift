@@ -825,7 +825,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         try selectable.withUnsafeHandle { fd in
             assert(registrations[Int(fd)] == nil)
             
-            print("register interested \(interested)")
+//            print("register interested \(interested)")
          ring.io_uring_prep_poll_add(fd: fd, poll_mask: interested.uringEventSet)
 
             registrations[Int(fd)] = makeRegistration(interested)
@@ -845,7 +845,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         assert(interested.contains(.reset), "must register for at least .reset but tried registering for \(interested)")
         try selectable.withUnsafeHandle { fd in
             var reg = registrations[Int(fd)]!
- print("reregister interested \(interested)")
+// print("reregister interested \(interested)")
             ring.io_uring_prep_poll_add(fd: fd, poll_mask: interested.uringEventSet)
 
             reg.interested = interested
@@ -897,17 +897,20 @@ override func deregister<S: Selectable>(selectable: S) throws {
         case .blockUntilTimeout(let timeAmount):
             ready = try Int(ring.io_uring_wait_cqe_timeout(events: &fds, timeout:timeAmount))
         case .block:
+//            print("x BBB 111")
             ready = Int(ring.io_uring_peek_batch_cqe(events: &fds)) // first try to consume any existing
+//            print("x BBB 111 22222")
 
             if (ready <= 0)   // otherwise block (only single supported, but we will empty cqe next run around...
             {
-                ready = try ring.io_uring_wait_cqe_timeout(events: &fds, timeout:TimeAmount.milliseconds(10))
-//                ready = try ring.io_uring_wait_cqe(events: &fds)
+//                print("x BBB 111 2222 3333")
+//                ready = try ring.io_uring_wait_cqe_timeout(events: &fds, timeout:TimeAmount.nanoseconds(1_000_000_000+38))
+                ready = try ring.io_uring_wait_cqe(events: &fds)
             }
         }
        if (ready > 0)
         {
-            print("fds: \(fds)")
+//            print("fds: \(fds)")
         }
         // start with no deregistrations happened
         self.deregistrationsHappened = false
@@ -916,33 +919,33 @@ override func deregister<S: Selectable>(selectable: S) throws {
         for f in fds where !self.deregistrationsHappened {
             let fd = f.0
             let poll_mask = f.1
-            print("x 111111")
-            print("x 111111 \(f.0) \(f.1)")
+//            print("x 111111")
+//            print("x 111111 \(f.0) \(f.1)")
             // If the registration is not in the Map anymore we deregistered it during the processing of whenReady(...). In this case just skipit.
             if let registration = registrations[Int(fd)] {
-                print("x 222")
+//                print("x 222")
 
                 var selectorEvent = SelectorEventSet(uringEvent: poll_mask)
-                print("33333")
+//                print("33333")
 
             // we can only verify the events for i == 0 as for i > 0 the user might have changed the registrations since then.
 //            assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
 
             // in any case we only want what the user is currently registered for & what we got
-                print("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
+//                print("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
             selectorEvent = selectorEvent.intersection(registration.interested)
-                print("intersection [\(selectorEvent)]")
+//                print("intersection [\(selectorEvent)]")
                 if selectorEvent.contains(.readEOF) {
-                    print("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
+//                    print("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
 
                 }
             guard selectorEvent != ._none else {
                  continue
              }
-            print("running body \(selectorEvent) \(registration)")
+//            print("running body \(selectorEvent) \(registration)")
             try body((SelectorEvent(io: selectorEvent, registration: registration)))
            }
-            print("ouch")
+//            print("ouch")
 
         }
         growEventArrayIfNeeded(ready: ready)
