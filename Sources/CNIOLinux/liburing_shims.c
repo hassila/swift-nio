@@ -121,10 +121,13 @@ static struct _liburing_functions_t
         printf("WARNING: Failed to resolve " #symbol " from liburing, falling back on epoll()\n");  \
         (void) dlclose(dl_handle); \
         return -1;  \
-    }  \
+    }
+
+/*\
     else {  \
         printf("Resolved "  #symbol " from liburing, %p\n", liburing_functions.symbol);  \
     }
+*/
 
 int CNIOLinux_io_uring_load()
 {
