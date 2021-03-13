@@ -263,7 +263,25 @@ int CNIOLinux_io_uring_submit_and_wait(struct io_uring *ring, unsigned wait_nr)
 
 struct io_uring_sqe *CNIOLinux_io_uring_get_sqe(struct io_uring *ring)
 {
-    return liburing_functions.io_uring_get_sqe(ring);
+    /*
+     * Adopting some retry code from queue.c from liburing with slight
+     * modifications - we never want to have to handle retries of
+     * SQE allocation in all places it could possibly occur.
+     *
+     * If the SQ ring is full, we may need to submit IO first
+     */
+    struct io_uring_sqe *sqe = liburing_functions.io_uring_get_sqe(ring);
+    int ret;
+    
+    while (!sqe) {
+        ret = CNIOLinux_io_uring_submit(ring);
+
+        assert(ret >= 0);
+
+        sqe = liburing_functions.io_uring_get_sqe(ring);
+    }
+
+    return sqe;
 }
 
 

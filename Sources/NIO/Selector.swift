@@ -807,6 +807,11 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         try ring.io_uring_queue_init()
 
         self.selectorFD = ring.fd()
+
+        self.eventFD = try EventFd.eventfd(initval: 0, flags: Int32(EventFd.EFD_CLOEXEC | EventFd.EFD_NONBLOCK))
+
+        ring.io_uring_prep_poll_add(fd: self.eventFD, poll_mask: Uring.POLLIN) // wakeups
+
         self.lifecycleState = .open
     }
     /// Register `Selectable` on the `Selector`.
@@ -908,6 +913,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
                 ready = try ring.io_uring_wait_cqe(events: &fds)
             }
         }
+//        print("fds: \(fds)")
        if (ready > 0)
         {
 //            print("fds: \(fds)")
@@ -922,6 +928,20 @@ override func deregister<S: Selectable>(selectable: S) throws {
 //            print("x 111111")
 //            print("x 111111 \(f.0) \(f.1)")
             // If the registration is not in the Map anymore we deregistered it during the processing of whenReady(...). In this case just skipit.
+            if fd == self.eventFD {
+//                print("wakeup successful fd [\(fd)]")
+                var val = EventFd.eventfd_t()
+                do
+                {
+                    _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
+                } catch
+                {
+//                    print("error wakeup successful 2 fd [\(fd)] val [\(val)]") // THIS IS THE STUFF
+
+                }
+//                print("wakeup successful 2 fd [\(fd)] val [\(val)]")
+                continue
+            }
             if let registration = registrations[Int(fd)] {
 //                print("x 222")
 
@@ -961,9 +981,15 @@ override func deregister<S: Selectable>(selectable: S) throws {
     /* attention, this may (will!) be called from outside the event loop, ie. can't access mutable shared state (such as `self.open`) */
     override func wakeup() throws {
         assert(NIOThread.current != self.myThread)
-        ring.io_uring_wakeup() // FIXME: check thread safety
+//        print("wakeup \(self.eventFD)")
+        try self.externalSelectorFDLock.withLock {
+
+            guard self.eventFD >= 0 else {
+                throw EventLoopError.shutdown
+            }
+            _ = try EventFd.eventfd_write(fd: self.eventFD, value: 1)
+        }
     }
- 
 #endif // os(Linux)
 }
 
