@@ -405,7 +405,7 @@ internal class Selector<R: Registration> {
         self.myThread = NIOThread.current
         events = Selector.allocateEventsArray(capacity: eventsCapacity)
         self.lifecycleState = .closed
-        if (sharedInitializationOnly) // for URing, we break out here
+        if (sharedInitializationOnly) // for URing, we break out here, should refactor to kqueue/epoll/uring separate subclasses probably
         {
             return
         }
@@ -754,7 +754,9 @@ internal class Selector<R: Registration> {
             // about.
 
             #if os(Linux) || os(Android)
-            try! Posix.close(descriptor: self.timerFD)
+            if (self.timerFD > 0) { // don't have one for uring
+                try! Posix.close(descriptor: self.timerFD)
+            }
             try! Posix.close(descriptor: self.eventFD)
 
             self.eventFD = -1
@@ -768,6 +770,7 @@ internal class Selector<R: Registration> {
 
     /* attention, this may (will!) be called from outside the event loop, ie. can't access mutable shared state (such as `self.open`) */
     func wakeup() throws {
+        _debugPrint("wakeup!")
         assert(NIOThread.current != self.myThread)
         try self.externalSelectorFDLock.withLock {
             #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -830,7 +833,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         try selectable.withUnsafeHandle { fd in
             assert(registrations[Int(fd)] == nil)
             
-//            print("register interested \(interested)")
+//            _debugPrint("register interested \(interested)")
          ring.io_uring_prep_poll_add(fd: fd, poll_mask: interested.uringEventSet)
 
             registrations[Int(fd)] = makeRegistration(interested)
@@ -850,7 +853,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         assert(interested.contains(.reset), "must register for at least .reset but tried registering for \(interested)")
         try selectable.withUnsafeHandle { fd in
             var reg = registrations[Int(fd)]!
-// print("reregister interested \(interested)")
+// _debugPrint("reregister interested \(interested)")
             ring.io_uring_prep_poll_add(fd: fd, poll_mask: interested.uringEventSet)
 
             reg.interested = interested
@@ -858,7 +861,10 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         }
     }
  
-
+public func _debugPrint(_ s:String)
+{
+  //  print("[\(NIOThread.current)] " + s)
+}
 
 /// Deregister `Selectable`, must be registered via `register` before.
 ///
@@ -890,6 +896,8 @@ override func deregister<S: Selectable>(selectable: S) throws {
     override func whenReady(strategy: SelectorStrategy, _ body: (SelectorEvent<R>) throws -> Void) throws -> Void {
         assert(self.myThread == NIOThread.current)
         guard self.lifecycleState == .open else {
+            _debugPrint("can't call whenReady for selector as it's \(self.lifecycleState).")
+
             throw IOError(errnoCode: EBADF, reason: "can't call whenReady for selector as it's \(self.lifecycleState).")
         }
 
@@ -898,11 +906,13 @@ override func deregister<S: Selectable>(selectable: S) throws {
 
         switch strategy {
         case .now:
+            _debugPrint("whenReady.now")
             ready = Int(ring.io_uring_peek_batch_cqe(events: &fds))
         case .blockUntilTimeout(let timeAmount):
+            _debugPrint("whenReady.blockUntilTimeout")
             ready = try Int(ring.io_uring_wait_cqe_timeout(events: &fds, timeout:timeAmount))
         case .block:
-//            print("x BBB 111")
+            _debugPrint("whenReady.block")
             ready = Int(ring.io_uring_peek_batch_cqe(events: &fds)) // first try to consume any existing
 //            print("x BBB 111 22222")
 
@@ -916,7 +926,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
 //        print("fds: \(fds)")
        if (ready > 0)
         {
-//            print("fds: \(fds)")
+        _debugPrint("fds: \(fds) ")
         }
         // start with no deregistrations happened
         self.deregistrationsHappened = false
@@ -925,48 +935,47 @@ override func deregister<S: Selectable>(selectable: S) throws {
         for f in fds where !self.deregistrationsHappened {
             let fd = f.0
             let poll_mask = f.1
-//            print("x 111111")
+            _debugPrint("x 111111")
 //            print("x 111111 \(f.0) \(f.1)")
             // If the registration is not in the Map anymore we deregistered it during the processing of whenReady(...). In this case just skipit.
-            if fd == self.eventFD {
-//                print("wakeup successful fd [\(fd)]")
-                var val = EventFd.eventfd_t()
-                do
-                {
-                    _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
-                } catch
-                {
-//                    print("error wakeup successful 2 fd [\(fd)] val [\(val)]") // THIS IS THE STUFF
+            switch fd {
+            case self.eventFD:
+                _debugPrint("wakeup successful fd [\(fd)] [\(NIOThread.current)]")
+                    var val = EventFd.eventfd_t()
+                    do {
+                        _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
+                    } catch let errorReturn {
+     // FIXME: Add assertion that only EAGAIN is expected here.
+//                        assert(errorReturn == EAGAIN, "eventfd_read return unexpected errno \(errorReturn)")
+                        _debugPrint("error wakeup 2 fd [\(fd)] errorReturn [\(errorReturn)] [\(NIOThread.current)]") // THIS IS THE STUFF
+//                        _debugPrint("\(errorReturn.errno)")
+                    }
+    //                _debugPrint("wakeup successful 2 fd [\(fd)] val [\(val)]")
+            default:
+                if let registration = registrations[Int(fd)] {
+                    _debugPrint("registration \(registration) for fd [\(fd)]")
 
-                }
-//                print("wakeup successful 2 fd [\(fd)] val [\(val)]")
-                continue
+                    var selectorEvent = SelectorEventSet(uringEvent: poll_mask)
+    //                _debugPrint("33333")
+
+                // we can only verify the events for i == 0 as for i > 0 the user might have changed the registrations since then.
+    //            assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
+
+                // in any case we only want what the user is currently registered for & what we got
+    //                _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
+                selectorEvent = selectorEvent.intersection(registration.interested)
+    //                _debugPrint("intersection [\(selectorEvent)]")
+                    if selectorEvent.contains(.readEOF) {
+    //                    _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
+
+                    }
+                guard selectorEvent != ._none else {
+                     continue
+                 }
+                    _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(registration)")
+                try body((SelectorEvent(io: selectorEvent, registration: registration)))
+               }
             }
-            if let registration = registrations[Int(fd)] {
-//                print("x 222")
-
-                var selectorEvent = SelectorEventSet(uringEvent: poll_mask)
-//                print("33333")
-
-            // we can only verify the events for i == 0 as for i > 0 the user might have changed the registrations since then.
-//            assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
-
-            // in any case we only want what the user is currently registered for & what we got
-//                print("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
-            selectorEvent = selectorEvent.intersection(registration.interested)
-//                print("intersection [\(selectorEvent)]")
-                if selectorEvent.contains(.readEOF) {
-//                    print("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
-
-                }
-            guard selectorEvent != ._none else {
-                 continue
-             }
-//            print("running body \(selectorEvent) \(registration)")
-            try body((SelectorEvent(io: selectorEvent, registration: registration)))
-           }
-//            print("ouch")
-
         }
         growEventArrayIfNeeded(ready: ready)
     }
@@ -975,21 +984,10 @@ override func deregister<S: Selectable>(selectable: S) throws {
     ///
     /// After closing the `Selector` it's no longer possible to use it.
     override public func close() throws {
+        /// FIXME: Here we should tear down the ring if possible
         return try super.close()
     }
 
-    /* attention, this may (will!) be called from outside the event loop, ie. can't access mutable shared state (such as `self.open`) */
-    override func wakeup() throws {
-        assert(NIOThread.current != self.myThread)
-//        print("wakeup \(self.eventFD)")
-        try self.externalSelectorFDLock.withLock {
-
-            guard self.eventFD >= 0 else {
-                throw EventLoopError.shutdown
-            }
-            _ = try EventFd.eventfd_write(fd: self.eventFD, value: 1)
-        }
-    }
 #endif // os(Linux)
 }
 

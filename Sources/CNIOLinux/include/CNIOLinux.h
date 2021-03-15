@@ -24,6 +24,7 @@
 #include <errno.h>
 #include <pthread.h>
 #include <netinet/ip.h>
+#include <poll.h>
 
 // Pull in io_uring if it's availble (Linux kernel 5.1+ systems, best performance with 5.11+)
 // https://github.com/axboe/liburing/issues/189#issuecomment-778304899

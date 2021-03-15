@@ -171,8 +171,8 @@ extension TimeAmount {
 
 public class Uring {
     private var ring = io_uring()
-    private let ring_entries: CUnsignedInt = 4096
-    private var iteratorIndex: Int?
+    private let ring_entries: CUnsignedInt = 8192
+//    private var iteratorIndex: Int?
 
     public static let POLLIN: CUnsignedInt = numericCast(CNIOLinux.POLLIN)
     public static let POLLOUT: CUnsignedInt = numericCast(CNIOLinux.POLLOUT)
@@ -181,11 +181,11 @@ public class Uring {
     public static let POLLHUP: CUnsignedInt = numericCast(CNIOLinux.POLLHUP)
 
 // FIXME: cqeCount should be bumped to a larger value for deployment, just keeping small for debugging
-//   let cqeCount = 10
-    let cqeCount = 10000
+    let cqeCount = 10
+//    let cqeCount = 10000
     var cqes : UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>
-    var emptyCqe = io_uring_cqe()
     var fdEvents = [Int32: (UInt32, UInt32)]() // fd : original_poll_mask, event_poll_return
+    var emptyCqe = io_uring_cqe()
 
     func dumpCqes(_ header:String)
     {
@@ -250,18 +250,16 @@ public class Uring {
          {
              throw UringError.eventFDregistrationFailure
          }
-//        CNIOLinux_io_uring_submit(&ring)
     }
         
     public func _io_uring_prep_poll_add_prep(fd: Int32, poll_mask: UInt32) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
         let bitPattern : Int = Int(Int(poll_mask) << 32) + Int(fd) // stuff poll_mask in upper 4 bytes
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(bitPattern))
-//        _debugPrint("io_uring_prep_poll_add bitPattern[" + String(bitPattern).decimalToHexa + "] bit[\(bitPattern)] poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))]")
+        _debugPrint("io_uring_prep_poll_add bitPattern[" + String(bitPattern).decimalToHexa + "] bit[\(bitPattern)] poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))]")
 
         CNIOLinux.io_uring_prep_poll_add(sqe, fd, poll_mask)
         CNIOLinux.io_uring_sqe_set_data(sqe, bitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
-//        CNIOLinux_io_uring_submit(&ring)
     }
     
     @inline(never)
@@ -288,7 +286,7 @@ public class Uring {
     }
 
     func _debugPrint(_ string : String) -> ()  {
-        print(string)
+     //   print("[\(NIOThread.current)] " + string)
     }
     
     @inline(never)
@@ -299,9 +297,9 @@ public class Uring {
         let currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, UInt32(cqeCount));
 //        print("io_uring_peek_batch_cqe211")
 
-        if (currentCqeCount > 0) {
-  //          dumpCqes("io_uring_peek_batch_cqe res0 [\(UInt32(cqes[0]!.pointee.res))]")
-        }
+//        if (currentCqeCount > 0) {
+//            dumpCqes("io_uring_peek_batch_cqe res0 [\(UInt32(cqes[0]!.pointee.res))]")
+//        }
 //        print("io_uring_peek_batch_cqe212 currentCqeCount \(currentCqeCount)")
 
         for i in 0 ..< currentCqeCount
@@ -311,40 +309,35 @@ public class Uring {
             let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[Int(i)]))
 //            print("io_uring_peek_batch_cqe22")
 
-            if bitPattern > 0 {
-                let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
-                let poll_mask = UInt32(bitPattern >> 32) // shift out the fd
-                let result = cqes[Int(i)]!.pointee.res
+            assert(bitPattern > 0, "Bitpattern should never be zero")
+            
+            let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
+            let poll_mask = UInt32(bitPattern >> 32) // shift out the fd
+            let result = cqes[Int(i)]!.pointee.res
 
-                if (result > 0) {
+            if (result > 0) {
 //                    _debugPrint("io_uring_peek_batch_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] i[\(i)] poll_mask[\(poll_mask)] currentCqeCount[\(currentCqeCount)]")
 
-                    let uresult = UInt32(result)
-                    if let current = fdEvents[fd] {
-//                        _debugPrint("masking in \(current), (\(poll_mask), \(result))")
-                        fdEvents[fd] = ((current.0 | poll_mask), (current.1 | uresult))
+                let uresult = UInt32(result)
+                if let current = fdEvents[fd] {
+//                    _debugPrint("masking in \(current), (\(poll_mask), \(result))")
+                    fdEvents[fd] = ((current.0 | poll_mask), (current.1 | uresult))
 //                        _debugPrint("masked in \(fdEvents[fd])")
-                    } else {
-                        fdEvents[fd] = (poll_mask, uresult)
-                    }
-//                    _debugPrint("result is \(result) \(fdEvents[fd])")
+                } else {
+                    fdEvents[fd] = (poll_mask, uresult)
                 }
-                else
-               {
-//                   _debugPrint("zero or negative return, result is \(result)")
-               }
+//                    _debugPrint("result is \(result) \(fdEvents[fd])")
             }
-            else {
-//               _debugPrint("io_uring_peek_batch_cqe zero bitPattern - wakeup")
-               }
-            CNIOLinux.io_uring_cqe_seen(&ring, cqes[Int(i)])
+            else
+           {
+//                   _debugPrint("zero or negative return, result is \(result)")
+           }
 
+//            CNIOLinux.io_uring_cqe_seen(&ring, cqes[Int(i)])
         }
 
-//        io_uring_cq_advance(&ring, currentCqeCount); // bulk variant of CNIOLinux.io_uring_cqe_seen(&ring, dataPointer)
+        io_uring_cq_advance(&ring, currentCqeCount); // bulk variant of CNIOLinux.io_uring_cqe_seen(&ring, dataPointer)
 
-//        cqes.initialize(repeating:&emptyCqe, count:cqeCount)
-//        dumpCqes("cqes.initialize")
         var needsFlush = false
         // merge all events and actual poll_mask
         for (fd, (poll_mask, result_mask)) in fdEvents {
@@ -360,7 +353,9 @@ public class Uring {
             } else
             {
 //                _debugPrint("444444")
-                _debugPrint("socket is going down \((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))")
+//                _debugPrint("socket is going down [\(fd)] [\(poll_mask)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
+//                socket is going down [16] [8221] [20] [16]
+
 //                _debugPrint("555555")
             }
 //            _debugPrint("6666666")
@@ -456,9 +451,6 @@ public class Uring {
                 throw UringError.uringWaitCqeTimeoutFailure
         }
         
-//        cqes.initialize(repeating:&emptyCqe, count:cqeCount)
-//        dumpCqes("cqes.initialize")
-
         return events.count
     }
 

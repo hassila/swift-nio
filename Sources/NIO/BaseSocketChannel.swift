@@ -191,6 +191,10 @@ private struct SocketChannelLifecycleManager {
         return self.currentState != .closed
     }
 }
+public func _debugPrint(_ s:String)
+{
+//    print("[\(NIOThread.current)] " + s)
+}
 
 /// The base class for all socket-based channels in NIO.
 ///
@@ -1048,6 +1052,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
     private final func readable0() -> ReadStreamState {
         self.eventLoop.assertInEventLoop()
         assert(self.lifecycleManager.isActive)
+        _debugPrint("readable0 1")
 
         defer {
             if self.isOpen && !self.readPending {
@@ -1057,6 +1062,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
 
         let readResult: ReadResult
         do {
+            _debugPrint("readable0 2")
             readResult = try self.readFromSocket()
         } catch let err {
             let readStreamState: ReadStreamState
@@ -1077,6 +1083,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
                         self.close0(error: err, mode: .input, promise: nil)
                     }
                     self.readPending = false
+                    _debugPrint("readable0 3")
                     return .eof
                 }
             } else {
@@ -1086,16 +1093,23 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
 
             // Call before triggering the close of the Channel.
             if readStreamState != .error, self.lifecycleManager.isActive {
+                _debugPrint("readable0 4")
                 self.pipeline.fireChannelReadComplete0()
             }
 
             if self.shouldCloseOnReadError(err) {
+                _debugPrint("readable0 5")
                 self.close0(error: err, mode: .all, promise: nil)
             }
 
             return readStreamState
         }
-        assert(readResult == .some)
+        _debugPrint("readResult [\(readResult)]")
+//        assert(readResult == .some)
+// FIXME: We hit this assert with uring as we can receive multiple
+        // socket accept readiness notifications, if we then fail to
+        // accept4() as no new connection is availble
+        // the readResult will return .none and we trap the assert
         if self.lifecycleManager.isActive {
             self.pipeline.fireChannelReadComplete0()
         }
