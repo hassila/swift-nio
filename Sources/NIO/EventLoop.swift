@@ -794,6 +794,7 @@ extension EventLoopGroup {
     }
 
     public func syncShutdownGracefully() throws {
+//        print("syncShutdownGracefully syncShutdownGracefully ")
         if let eventLoop = MultiThreadedEventLoopGroup.currentEventLoop {
             preconditionFailure("""
             BUG DETECTED: syncShutdownGracefully() must not be called when on an EventLoop.
@@ -804,15 +805,21 @@ extension EventLoopGroup {
         let errorStorageLock = Lock()
         var errorStorage: Error? = nil
         let continuation = DispatchWorkItem {}
+//        print("syncShutdownGracefully syncShutdownGracefully 2")
         self.shutdownGracefully { error in
+//            print("syncShutdownGracefully error \(error)")
             if let error = error {
                 errorStorageLock.withLock {
+//                    print("syncShutdownGracefully \(error) errorStorageLock \(errorStorageLock)")
                     errorStorage = error
                 }
             }
+//           print("[\(NIOThread.current)] perform() sssyncShutdownGracefully \(continuation)")
             continuation.perform()
         }
+//        print("[\(NIOThread.current)] waiting for \(continuation)")
         continuation.wait()
+//        print("syncShutdownGracefully syncShutdownGracefully 4 \(continuation)")
         try errorStorageLock.withLock {
             if let error = errorStorage {
                 throw error
@@ -868,13 +875,20 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
     private let shutdownLock: Lock = Lock()
     private var runState: RunState = .running
 
+    // FIXME: This is not thread safe, needs some other mechanism for guaranteeing single use
+    private static var initializedUring = false
     private static func selectorFactory() throws -> NIO.Selector<NIORegistration>
     {
         #if os(Linux)
         do {
-            try Uring.io_uring_load()
+            if initializedUring == false
+            {
+                try Uring.io_uring_load()
+                initializedUring = true
+            }
             return try NIO.URingSelector<NIORegistration>.init()
         } catch  {
+            print("Failed URingSelector")
         }
         #endif
         return try NIO.Selector<NIORegistration>.init()
@@ -948,7 +962,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
                               selectorFactory: @escaping () throws -> NIO.Selector<NIORegistration>) {
         precondition(numberOfThreads > 0, "numberOfThreads must be positive")
         let initializers: [ThreadInitializer] = Array(repeating: { _ in }, count: numberOfThreads)
-        self.init(threadInitializers: initializers, selectorFactory: selectorFactory)
+        self.init(threadInitializers: initializers, selectorFactory: MultiThreadedEventLoopGroup.selectorFactory)
     }
 
     /// Creates a `MultiThreadedEventLoopGroup` instance which uses the given `ThreadInitializer`s. One `NIOThread` per `ThreadInitializer` is created and used.
@@ -963,7 +977,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
         self.eventLoops = threadInitializers.map { initializer in
             // Maximum name length on linux is 16 by default.
             let ev = MultiThreadedEventLoopGroup.setupThreadAndEventLoop(name: "NIO-ELT-\(myGroupID)-#\(idx)",
-                                                                         selectorFactory: selectorFactory,
+                                                                         selectorFactory: MultiThreadedEventLoopGroup.selectorFactory,
                                                                          initializer: initializer)
             idx += 1
             return ev
@@ -1007,10 +1021,13 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
         // This method cannot perform its final cleanup using EventLoopFutures, because it requires that all
         // our event loops still be alive, and they may not be. Instead, we use Dispatch to manage
         // our shutdown signaling, and then do our cleanup once the DispatchQueue is empty.
+// print("[\(NIOThread.current)] shutdownGracefully")
         let g = DispatchGroup()
         let q = DispatchQueue(label: "nio.shutdownGracefullyQueue", target: queue)
+//print("[\(NIOThread.current)] 2")
         let wasRunning: Bool = self.shutdownLock.withLock {
             // We need to check the current `runState` and react accordingly.
+//           print("[\(NIOThread.current)] 2 self.runState \(self.runState)")
             switch self.runState {
             case .running:
                 // If we are still running, we set the `runState` to `closing`,
@@ -1025,24 +1042,28 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
                 self.runState = .closing(callbacks)
                 return false
             case .closed(let error):
-                // If we are already closed, we can directly dispatch the `handler`
+               // If we are already closed, we can directly dispatch the `handler`
+//          print("[\(NIOThread.current)] are already closed, we can directly dispatch the \(self.runState)")
                 q.async {
                     handler(error)
                 }
                 return false
             }
         }
+//        print("[\(NIOThread.current)] 4")
 
         // If the `runState` was not `running` when `shutdownGracefully` was called,
         // the shutdown has already been initiated and we have to return here.
         guard wasRunning else {
             return
         }
+//        print("[\(NIOThread.current)] 5")
 
         var result: Result<Void, Error> = .success(())
 
         for loop in self.eventLoops {
             g.enter()
+//            print("[\(NIOThread.current)] initiateClose")
             loop.initiateClose(queue: q) { closeResult in
                 switch closeResult {
                 case .success:
@@ -1050,16 +1071,20 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
                 case .failure(let error):
                     result = .failure(error)
                 }
+//                print("[\(NIOThread.current)] g.leave")
                 g.leave()
             }
         }
+//        print("[\(NIOThread.current)] 6")
 
         g.notify(queue: q) {
+//            print("[\(NIOThread.current)] 6.1")
             for loop in self.eventLoops {
                 loop.syncFinaliseClose(joinThread: true)
             }
             var overallError: Error?
             var queueCallbackPairs: [(DispatchQueue, (Error?) -> Void)]? = nil
+//            print("[\(NIOThread.current)] 6.2 \(self.runState)")
             self.shutdownLock.withLock {
                 switch self.runState {
                 case .closed, .running:
@@ -1076,6 +1101,8 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
                 }
             }
 
+//            print("[\(NIOThread.current)] 7")
+
             queue.async {
                 handler(overallError)
             }
@@ -1085,6 +1112,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
                 }
             }
         }
+//        print("[\(NIOThread.current)] 63 exit")
     }
 
     /// Convert the calling thread into an `EventLoop`.
@@ -1099,7 +1127,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
         let callingThread = NIOThread.current
         MultiThreadedEventLoopGroup.runTheLoop(thread: callingThread,
                                                canEventLoopBeShutdownIndividually: true,
-                                               selectorFactory: MultiThreadedEventLoopGroup.selectorFactory,
+                                               selectorFactory: selectorFactory,
                                                initializer: { _ in }) { loop in
             loop.assertInEventLoop()
             callback(loop)
