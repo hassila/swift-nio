@@ -799,7 +799,7 @@ _debugPrint("wakeup")
                     throw EventLoopError.shutdown
                 }
             _ = try EventFd.eventfd_write(fd: self.eventFD, value: 1)
-            _debugPrint("eventfd_write done for eventfd_write [\(eventfd_write)]")
+            _debugPrint("eventfd_write done for eventfd_write [\(self.eventFD)]")
            #endif
         }
     }
