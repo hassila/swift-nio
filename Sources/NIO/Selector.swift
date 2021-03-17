@@ -845,7 +845,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         try selectable.withUnsafeHandle { fd in
             assert(registrations[Int(fd)] == nil)
             
-//            _debugPrint("register interested \(interested)")
+            _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
          ring.io_uring_prep_poll_add(fd: fd, poll_mask: interested.uringEventSet)
 
             registrations[Int(fd)] = makeRegistration(interested)
@@ -865,8 +865,9 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         assert(interested.contains(.reset), "must register for at least .reset but tried registering for \(interested)")
         try selectable.withUnsafeHandle { fd in
             var reg = registrations[Int(fd)]!
-// _debugPrint("reregister interested \(interested)")
-            ring.io_uring_prep_poll_add(fd: fd, poll_mask: interested.uringEventSet)
+            _debugPrint("reregister interested \(interested) old \(reg.interested) uringEventSet [\(interested.uringEventSet)] reg.uringEventSet [\(reg.interested.uringEventSet)]")
+//            ring.io_uring_prep_poll_add(fd: fd, poll_mask: interested.uringEventSet)
+            ring.io_uring_poll_replace(fd: fd, newPollmask: interested.uringEventSet, oldPollmask:reg.interested.uringEventSet)
 
             reg.interested = interested
             registrations[Int(fd)] = reg
@@ -875,7 +876,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
  
 public func _debugPrint(_ s:String)
 {
-    print("[\(NIOThread.current)] " + s)
+//    print("[\(NIOThread.current)] " + s)
 }
 
 /// Deregister `Selectable`, must be registered via `register` before.
@@ -895,6 +896,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
         guard let reg = registrations.removeValue(forKey: Int(fd)) else {
             return
         }
+        _debugPrint("deregister interested \(reg) reg.interested.uringEventSet [\(reg.interested.uringEventSet)]")
         ring.io_uring_prep_poll_remove(fd: fd, poll_mask: reg.interested.uringEventSet)
     }
 }
@@ -936,23 +938,25 @@ override func deregister<S: Selectable>(selectable: S) throws {
         // start with no deregistrations happened
         self.deregistrationsHappened = false
 
+        var registrationSet = Set<Int>()
+
         // temporary workaround to stop us delivering outdated events; possibly set in `deregister`
-        for f in fds where !self.deregistrationsHappened {
+        for f in fds where !self.deregistrationsHappened { // where !self.deregistrationsHappened
             let fd = f.0
             let poll_mask = f.1
 
-            _debugPrint("for f in fds \(f.0) \(f.1)")
+            _debugPrint("for f in fds \(f.0) \(f.1), self.deregistrationsHappened [\(self.deregistrationsHappened)]")
             // If the registration is not in the Map anymore we deregistered it during the processing of whenReady(...). In this case just skipit.
             switch fd {
             case self.eventFD:
                _debugPrint("wakeup successful fd [\(fd)] [\(NIOThread.current)]")
+//                ring.io_uring_prep_poll_add(fd: self.eventFD, poll_mask: poll_mask, submitNow:false)
+                ring.io_uring_prep_poll_add(fd: self.eventFD, poll_mask: poll_mask, submitNow:true)
                     var val = EventFd.eventfd_t()
                     do {
                         _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
                         // some explanation is in order. we need to specifically reregister
-                        // the polling of the eventfd descriptor 
-                  //      ring.io_uring_prep_poll_add(fd: self.eventFD, poll_mask: poll_mask)
-
+                        // the polling of the eventfd descriptor
                     } catch let errorReturn {
      // FIXME: Add assertion that only EAGAIN is expected here.
 //                        assert(errorReturn == EAGAIN, "eventfd_read return unexpected errno \(errorReturn)")
@@ -962,30 +966,51 @@ override func deregister<S: Selectable>(selectable: S) throws {
     //                _debugPrint("wakeup successful 2 fd [\(fd)] val [\(val)]")
             default:
                 if let registration = registrations[Int(fd)] {
-//                    _debugPrint("registration \(registration) for fd [\(fd)]")
+                    _debugPrint("registration \(registration) for fd [\(fd)]")
 
                     var selectorEvent = SelectorEventSet(uringEvent: poll_mask)
+                    let socketClosing = (poll_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
     //                _debugPrint("33333")
 
                 // we can only verify the events for i == 0 as for i > 0 the user might have changed the registrations since then.
     //            assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
 
                 // in any case we only want what the user is currently registered for & what we got
-//                    _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
+                    _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
                 selectorEvent = selectorEvent.intersection(registration.interested)
-    //                _debugPrint("intersection [\(selectorEvent)]")
+                    _debugPrint("intersection [\(selectorEvent)]")
+
                     if selectorEvent.contains(.readEOF) {
-    //                    _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
+                        _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
 
                     }
-                guard selectorEvent != ._none else {
-                     continue
-                 }
-                    _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(registration)")
-                try body((SelectorEvent(io: selectorEvent, registration: registration)))
-               }
+                    if !socketClosing { // reregister for polling if not closing
+                        registrationSet.insert(Int(fd))
+//                        ring.io_uring_prep_poll_add(fd: fd, poll_mask: registration.interested.uringEventSet, submitNow:true)
+//                        ring.io_uring_prep_poll_add(fd: fd, poll_mask: registration.interested.uringEventSet, submitNow:false)
+                    }
+                    guard selectorEvent != ._none else {
+                        _debugPrint("selectorEvent != ._none / [\(selectorEvent)] [\(registration.interested)] [\(SelectorEventSet(uringEvent: poll_mask))] [\(poll_mask)] [\(fd)]")
+                        continue
+                    }
+
+                    _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(SelectorEventSet(uringEvent: poll_mask))")
+                    
+                    try body((SelectorEvent(io: selectorEvent, registration: registration)))
+                    
+               } else { // remove any polling if we don't have a registration for it
+                    _debugPrint("We had no registration for fd [\(fd)] poll_mask [\(poll_mask)] - removing it")
+//                    ring.io_uring_prep_poll_remove(fd: fd, poll_mask: poll_mask)
+                }
             }
         }
+        for fd in registrationSet {
+            if let registration = registrations[Int(fd)] {
+                ring.io_uring_prep_poll_add(fd: Int32(fd), poll_mask: registration.interested.uringEventSet, submitNow:false)
+            }
+        }
+        registrationSet.removeAll()
+        ring.io_uring_flush() // flush reregisteration of the polls if needed (nop in SQPOLL mode)
         growEventArrayIfNeeded(ready: ready)
     }
 

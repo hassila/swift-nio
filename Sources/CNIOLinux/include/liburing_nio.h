@@ -78,6 +78,8 @@ int CNIOLinux___io_uring_get_cqe(struct io_uring *ring,
 
 // inlined functions
 int CNIOLinux_io_uring_wait_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr);
+unsigned CNIOLinux_io_uring_sq_ready(const struct io_uring *ring);
+void CNIOLinux_io_uring_sqe_set_linked(struct io_uring_sqe *sqe);
 
 #endif /* __linux__ */
 
