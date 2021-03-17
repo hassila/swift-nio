@@ -279,6 +279,8 @@ struct io_uring_sqe *CNIOLinux_io_uring_get_sqe(struct io_uring *ring)
         assert(ret >= 0);
 
         sqe = liburing_functions.io_uring_get_sqe(ring);
+// FIXME: When adding support for SQPOLL we should use this for waiting here instead/also
+            // static inline int io_uring_sqring_wait(struct io_uring *ring)
     }
 
     return sqe;
@@ -411,6 +413,19 @@ int CNIOLinux_io_uring_wait_cqe(struct io_uring *ring,
 {
     return CNIOLinux_io_uring_wait_cqe_nr(ring, cqe_ptr, 1);
 }
+
+
+/*
+ * Returns number of unconsumed (if SQPOLL) or unsubmitted entries exist in
+ * the SQ ring
+ */
+unsigned CNIOLinux_io_uring_sq_ready(const struct io_uring *ring)
+{
+    return io_uring_sq_ready(ring);
+}
+
+
+
 
 /*inline extern struct io_uring_sqe *CNIOLinux_io_uring_get_sqe(struct io_uring *ring)
 {

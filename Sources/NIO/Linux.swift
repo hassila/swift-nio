@@ -225,19 +225,25 @@ public class Uring {
         _debugPrint("exit uring")
         CNIOLinux_io_uring_queue_exit(&ring)
     }
-    
-    public func _io_uring_prep_poll_add_prep(fd: Int32, poll_mask: UInt32) -> () {
-        let sqe = CNIOLinux_io_uring_get_sqe(&ring)
-        let bitPattern : Int = Int(Int(poll_mask) << 32) + Int(fd) // stuff poll_mask in upper 4 bytes
-        let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(bitPattern))
-//        _debugPrint("_io_uring_prep_poll_add_prep bitPattern[" + String(bitPattern).decimalToHexa + "] bit[\(bitPattern)] poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))]")
 
-        CNIOLinux.io_uring_prep_poll_add(sqe, fd, poll_mask)
-        CNIOLinux.io_uring_sqe_set_data(sqe, bitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
+    public func io_uring_flush() {
+        _debugPrint("io_uring_flush")
+        var submissiontimes = 0
+
+        while (CNIOLinux_io_uring_sq_ready(&ring) > 0)
+        {
+            if submissiontimes > 0 {
+                _debugPrint("io_uring_flush io_uring_submit needed \(submissiontimes)")
+            } else  {
+                _debugPrint("First CNIOLinux_io_uring_submit in io_uring_flush")
+            }
+            CNIOLinux_io_uring_submit(&ring)
+            submissiontimes += 1
+        }
     }
-    
+
     @inline(never)
-    public func io_uring_prep_poll_add(fd: Int32, poll_mask: UInt32) -> () {
+    public func io_uring_prep_poll_add(fd: Int32, poll_mask: UInt32, submitNow: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
         let bitPattern : Int = Int(Int(poll_mask) << 32) + Int(fd) // stuff poll_mask in upper 4 bytes
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(bitPattern))
@@ -246,11 +252,13 @@ public class Uring {
 
         CNIOLinux.io_uring_prep_poll_add(sqe, fd, poll_mask)
         CNIOLinux.io_uring_sqe_set_data(sqe, bitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
-        CNIOLinux_io_uring_submit(&ring)
+        if submitNow {
+            CNIOLinux_io_uring_submit(&ring)
+        }
     }
     
     @inline(never)
-    public func io_uring_prep_poll_remove(fd: Int32, poll_mask: UInt32) -> () {
+    public func io_uring_prep_poll_remove(fd: Int32, poll_mask: UInt32, submitNow: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
         let bitPattern : Int = Int(Int(poll_mask) << 32) + Int(fd) // stuff poll_mask in upper 4 bytes
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(bitPattern))
@@ -259,8 +267,20 @@ public class Uring {
 
         CNIOLinux.io_uring_prep_poll_remove(sqe, bitpatternAsPointer)
         CNIOLinux.io_uring_sqe_set_data(sqe, bitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
-        CNIOLinux_io_uring_submit(&ring)
+        if submitNow {
+            CNIOLinux_io_uring_submit(&ring)
+        }
     }
+
+    @inline(never)
+    public func io_uring_poll_replace(fd: Int32, newPollmask: UInt32, oldPollmask: UInt32) -> () {
+        _debugPrint("io_uring_poll_replace fd[\(fd)] oldPollmask[\(oldPollmask)]  newPollmask[\(newPollmask)]")
+
+        io_uring_prep_poll_remove(fd: fd, poll_mask: oldPollmask, submitNow: false)
+        io_uring_prep_poll_add(fd: fd, poll_mask: newPollmask, submitNow: false)
+        io_uring_flush()
+    }
+
 
     func _debugPrint(_ string : String) -> ()  {
          print("[\(NIOThread.current)] " + string)
@@ -283,7 +303,7 @@ public class Uring {
 
             assert(bitPattern > 0, "Bitpattern should never be zero")
 
-            _debugPrint("io_uring_peek_batch_cqe poll_mask[\(poll_mask)] fd[\(fd)] bitpattern[\(bitPattern)] currentCqeCount [\(currentCqeCount)]")
+            _debugPrint("io_uring_peek_batch_cqe poll_mask[\(poll_mask)] fd[\(fd)] bitpattern[\(bitPattern)] currentCqeCount [\(currentCqeCount)] result [\(result)]")
 
             if (result > 0) {
 //                    _debugPrint("io_uring_peek_batch_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] i[\(i)] poll_mask[\(poll_mask)] currentCqeCount[\(currentCqeCount)]")
@@ -294,6 +314,8 @@ public class Uring {
                 } else {
                     fdEvents[fd] = (poll_mask, uresult)
                 }
+
+
 //                    _debugPrint("result is \(result) \(fdEvents[fd])")
             }
             else
@@ -305,23 +327,21 @@ public class Uring {
 
         io_uring_cq_advance(&ring, currentCqeCount); // bulk variant of CNIOLinux.io_uring_cqe_seen(&ring, dataPointer)
 
-//        var needsFlush = false
-
         // merge all events and actual poll_mask returned/to reuse.
+
         for (fd, (poll_mask, result_mask)) in fdEvents {
 
             let socketClosing = (result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
 
             if (socketClosing == false) {
-//                needsFlush = true
-//                self._io_uring_prep_poll_add_prep(fd: fd, poll_mask: poll_mask) // requires an io_uring_submit later - broken see below
-                self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask) // requires an io_uring_submit later
+//                self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask, submitNow: false) // requires an io_uring_submit later
             } else
             {
                 _debugPrint("socket is going down [\(fd)] [\(poll_mask)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
             }
             events.append((fd, result_mask))
         }
+
 /*
          
          Ok, this was a real bummer - turns out that flushing multiple SQE:s
@@ -337,6 +357,10 @@ public class Uring {
             debugPrint("subitted \(submitted)")
         }
 */
+        
+        // FIXME: When supporting SQPOLL, we should just skip this
+//        io_uring_flush()
+
         _debugPrint("io_uring_peek_batch_cqe returning [\(events.count)] fdEvents [\(fdEvents)]")
 
         fdEvents.removeAll(keepingCapacity: true) // reused for next batch
