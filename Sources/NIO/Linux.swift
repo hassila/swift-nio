@@ -147,7 +147,7 @@ extension TimeAmount {
 
 public class Uring {
     private var ring = io_uring()
-    private let ring_entries: CUnsignedInt = 4096
+    private let ring_entries: CUnsignedInt = 16384 // 4096
     private let cqeCount = 10
 
     // FIXME: cqeCount should be bumped to a larger value for deployment, just keeping small for debugging
@@ -158,15 +158,19 @@ public class Uring {
     public static let POLLERR: CUnsignedInt = numericCast(CNIOLinux.POLLERR)
     public static let POLLRDHUP: CUnsignedInt = numericCast(CNIOLinux.EPOLLRDHUP.rawValue) // FIXME: - POLLRDHUP not available on ubuntu headers?!
     public static let POLLHUP: CUnsignedInt = numericCast(CNIOLinux.POLLHUP)
-
+        
     var cqes : UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>
     var fdEvents = [Int32: (UInt32, UInt32)]() // fd : original_poll_mask, event_poll_return
+    var fdEventsToReregister = [Int32: UInt32]() // fd : poll_mask - used for reregistering failed linked cqes
     var emptyCqe = io_uring_cqe()
 
-    func dumpCqes(_ header:String)
+    func dumpCqes(_ header:String, count: Int)
     {
+        if count < 0 {
+            return
+        }
         _debugPrint(header + " CQE:s [\(cqes)]")
-        for i in 0..<cqeCount {
+        for i in 0..<count {
             let c = cqes[i]!.pointee
 
             let dp = io_uring_cqe_get_data(cqes[i])
@@ -178,6 +182,7 @@ public class Uring {
             _debugPrint("\(i) = \(String(describing:cqes[i])) | user_data [\(c.user_data)] res [\(c.res)] flags [\(c.flags)] fd[\(fd)] poll_mask[\(poll_mask)]")
         }
     }
+    
     init() {
         cqes = UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>.allocate(capacity: cqeCount)
         cqes.initialize(repeating:&emptyCqe, count:cqeCount)
@@ -226,19 +231,40 @@ public class Uring {
         CNIOLinux_io_uring_queue_exit(&ring)
     }
 
-    public func io_uring_flush() {
+    /*
+        Ok, this was a real bummer - turns out that flushing multiple SQE:s
+        can fail midflight and this will actually happen when e.g. a socket
+        has gone down and we are re-regsitering poll for both the socket fd
+        and e.g. eventfd - this means we will silently lose any entries after the
+        failed fd. Ouch. Proper approach is to use io_uring_sq_ready() in a loop.
+        See: https://github.com/axboe/liburing/issues/309
+    */
+            
+    public func io_uring_flush() {         // When using SQPOLL this is just a NOP
         _debugPrint("io_uring_flush")
-        var submissiontimes = 0
 
+        var submissiontimes = 0
+        var retval : Int32
+        
+        // FIXME:  it may return -EAGAIN or -ENOMEM when there is not enough memory to do internal allocations.
         while (CNIOLinux_io_uring_sq_ready(&ring) > 0)
         {
-            if submissiontimes > 0 {
-                _debugPrint("io_uring_flush io_uring_submit needed \(submissiontimes)")
-            } else  {
-                _debugPrint("First CNIOLinux_io_uring_submit in io_uring_flush")
-            }
-            CNIOLinux_io_uring_submit(&ring)
+            retval = CNIOLinux_io_uring_submit(&ring)
             submissiontimes += 1
+
+            if submissiontimes > 1 {
+                if (retval == -EAGAIN)
+                {
+//                    print("io_uring_flush io_uring_submit -EAGAIN \(submissiontimes)")
+
+                }
+                if (retval == -ENOMEM)
+                {
+//                    print("io_uring_flush io_uring_submit -ENOMEM \(submissiontimes)")
+
+                }
+                _debugPrint("io_uring_flush io_uring_submit needed \(submissiontimes)")
+            }
         }
     }
 
@@ -248,7 +274,7 @@ public class Uring {
         let bitPattern : Int = Int(Int(poll_mask) << 32) + Int(fd) // stuff poll_mask in upper 4 bytes
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(bitPattern))
 
-        _debugPrint("io_uring_prep_poll_add poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))]")
+        _debugPrint("io_uring_prep_poll_add poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] submitNow[\(submitNow)]")
 
         CNIOLinux.io_uring_prep_poll_add(sqe, fd, poll_mask)
         CNIOLinux.io_uring_sqe_set_data(sqe, bitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
@@ -258,15 +284,19 @@ public class Uring {
     }
     
     @inline(never)
-    public func io_uring_prep_poll_remove(fd: Int32, poll_mask: UInt32, submitNow: Bool = true) -> () {
+    public func io_uring_prep_poll_remove(fd: Int32, poll_mask: UInt32, submitNow: Bool = true, linkSQE: Bool = false) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
         let bitPattern : Int = Int(Int(poll_mask) << 32) + Int(fd) // stuff poll_mask in upper 4 bytes
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(bitPattern))
 //        _debugPrint("io_uring_prep_poll_remove bitPattern[" + String(bitPattern).decimalToHexa + "] bit[\(bitPattern)] poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))]")
-        _debugPrint("io_uring_prep_poll_remove poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))]")
+        _debugPrint("io_uring_prep_poll_remove poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] linkSQE[\(linkSQE)]")
 
         CNIOLinux.io_uring_prep_poll_remove(sqe, bitpatternAsPointer)
         CNIOLinux.io_uring_sqe_set_data(sqe, bitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
+
+        if linkSQE {
+            CNIOLinux_io_uring_sqe_set_linked(sqe)
+        }
         if submitNow {
             CNIOLinux_io_uring_submit(&ring)
         }
@@ -276,14 +306,15 @@ public class Uring {
     public func io_uring_poll_replace(fd: Int32, newPollmask: UInt32, oldPollmask: UInt32) -> () {
         _debugPrint("io_uring_poll_replace fd[\(fd)] oldPollmask[\(oldPollmask)]  newPollmask[\(newPollmask)]")
 
-        io_uring_prep_poll_remove(fd: fd, poll_mask: oldPollmask, submitNow: false)
+        io_uring_prep_poll_remove(fd: fd, poll_mask: oldPollmask, submitNow: false, linkSQE:true)
+
         io_uring_prep_poll_add(fd: fd, poll_mask: newPollmask, submitNow: false)
         io_uring_flush()
     }
 
 
     func _debugPrint(_ string : String) -> ()  {
-         print("[\(NIOThread.current)] " + string)
+//         print("[\(NIOThread.current)] " + string)
     }
     
     @inline(never)
@@ -292,6 +323,12 @@ public class Uring {
         let currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, UInt32(cqeCount));
 
         //            dumpCqes("io_uring_peek_batch_cqe currentCqeCount [\(currentCqeCount)] res0 [\(UInt32(cqes[0]!.pointee.res))]")
+
+        if currentCqeCount == 0 {
+            return 0
+        }
+        
+//        dumpCqes("io_uring_peek_batch_cqe", count: Int(currentCqeCount))
 
         assert(currentCqeCount >= 0, "currentCqeCount should never be negative")
         for i in 0 ..< currentCqeCount
@@ -303,68 +340,78 @@ public class Uring {
 
             assert(bitPattern > 0, "Bitpattern should never be zero")
 
-            _debugPrint("io_uring_peek_batch_cqe poll_mask[\(poll_mask)] fd[\(fd)] bitpattern[\(bitPattern)] currentCqeCount [\(currentCqeCount)] result [\(result)]")
+//            _debugPrint("io_uring_peek_batch_cqe poll_mask[\(poll_mask)] fd[\(fd)] bitpattern[\(bitPattern)] currentCqeCount [\(currentCqeCount)] result [\(result)]")
 
-            if (result > 0) {
-//                    _debugPrint("io_uring_peek_batch_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] i[\(i)] poll_mask[\(poll_mask)] currentCqeCount[\(currentCqeCount)]")
+            switch result {
+                case -ECANCELED: // -ECANCELED for linked adds, so we should add them again
+                    
+                    if let current = fdEventsToReregister[fd] {
+                        fdEventsToReregister[fd] = (current | poll_mask)
+                    } else {
+                        fdEventsToReregister[fd] = poll_mask
+                    }
 
-                let uresult = UInt32(result)
-                if let current = fdEvents[fd] {
-                    fdEvents[fd] = ((current.0 | poll_mask), (current.1 | uresult))
-                } else {
-                    fdEvents[fd] = (poll_mask, uresult)
-                }
-
-
-//                    _debugPrint("result is \(result) \(fdEvents[fd])")
+//                    self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask, submitNow: false) // requires an io_uring_submit later
+                case -ENOENT:    // -ENOENT returned for failed poll remove
+                    break
+                case -EBADF:
+                    break
+/*                    if let current = fdEvents[fd] {
+                        fdEvents[fd] = ((current.0 | poll_mask), (current.1 | Uring.POLLERR))
+                    } else {
+                        fdEvents[fd] = (poll_mask, Uring.POLLERR)
+                    } */
+                case ..<0: // other errors
+                    _debugPrint("fdEventsToReregister setting to nil for fd [\(fd)] result [\(result)]")
+                    fdEventsToReregister[fd] = nil
+                    break
+                case 0: // successfull chained add, not an event
+                    _debugPrint("fdEventsToReregister setting to nil for fd [\(fd)] result [\(result)]")
+                    fdEventsToReregister[fd] = nil
+                    break
+                default: // positive success
+                    // _debugPrint("io_uring_peek_batch_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] i[\(i)] poll_mask[\(poll_mask)] currentCqeCount[\(currentCqeCount)]")
+                    let uresult = UInt32(result)
+                    if let current = fdEvents[fd] {
+                        fdEvents[fd] = ((current.0 | poll_mask), (current.1 | uresult))
+                    } else {
+                        fdEvents[fd] = (poll_mask, uresult)
+                    }
             }
-            else
-           {
-//                   _debugPrint("zero or negative return, result is \(result)")
-           }
-//            CNIOLinux.io_uring_cqe_seen(&ring, cqes[Int(i)])
+//            io_uring_cqe_seen(&ring, cqes[Int(i)])
         }
 
-        io_uring_cq_advance(&ring, currentCqeCount); // bulk variant of CNIOLinux.io_uring_cqe_seen(&ring, dataPointer)
+        for (fd, poll_mask) in fdEventsToReregister {
+            _debugPrint("io_uring_peek_batch_cqe fdEventsToReregister fd [\(fd)] poll_mask [\(poll_mask)]")
+            self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask, submitNow: false)
+        }
 
-        // merge all events and actual poll_mask returned/to reuse.
+        io_uring_cq_advance(&ring, currentCqeCount) // bulk variant of io_uring_cqe_seen(&ring, dataPointer)
+        io_uring_flush() // and flush any new poll adds if needed
 
+        // merge all events and actual poll_mask to return
         for (fd, (poll_mask, result_mask)) in fdEvents {
 
             let socketClosing = (result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
 
-            if (socketClosing == false) {
-//                self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask, submitNow: false) // requires an io_uring_submit later
-            } else
-            {
-                _debugPrint("socket is going down [\(fd)] [\(poll_mask)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
+            if (socketClosing == true) {
+                    _debugPrint("socket is going down [\(fd)] [\(poll_mask)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
             }
             events.append((fd, result_mask))
         }
 
-/*
-         
-         Ok, this was a real bummer - turns out that flushing multiple SQE:s
-         can fail midflight and this will actually happen when e.g. a socket
-         has gone down and we are re-regsitering poll for both the socket fd
-         and e.g. eventfd - this means we will silently lose any entries after the
-         failed fd. Ouch. Best idea in the meantime is to take the overhead
-         of submitting each SQE individually.
-         
-        if needsFlush {
-         _debugPrint("needsFlush")
-            let submitted = CNIOLinux_io_uring_submit(&ring)
-            debugPrint("subitted \(submitted)")
+        if events.count > 0
+        {
+            _debugPrint("io_uring_peek_batch_cqe returning [\(events.count)] fdEvents [\(fdEvents)]")
+        } else if fdEvents.count > 0
+        {
+            _debugPrint("fdEvents.count > 0 but 0 event.count returning [\(events.count)] fdEvents [\(fdEvents)]")
+
         }
-*/
-        
-        // FIXME: When supporting SQPOLL, we should just skip this
-//        io_uring_flush()
 
-        _debugPrint("io_uring_peek_batch_cqe returning [\(events.count)] fdEvents [\(fdEvents)]")
-
+        fdEventsToReregister.removeAll(keepingCapacity: true)
         fdEvents.removeAll(keepingCapacity: true) // reused for next batch
-
+    
         return events.count
     }
 

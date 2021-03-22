@@ -425,7 +425,10 @@ unsigned CNIOLinux_io_uring_sq_ready(const struct io_uring *ring)
 }
 
 
-
+void CNIOLinux_io_uring_sqe_set_linked(struct io_uring_sqe *sqe)
+{
+    sqe->flags |= IOSQE_IO_LINK;
+}
 
 /*inline extern struct io_uring_sqe *CNIOLinux_io_uring_get_sqe(struct io_uring *ring)
 {
