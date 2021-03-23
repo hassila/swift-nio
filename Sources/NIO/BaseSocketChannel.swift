@@ -191,9 +191,17 @@ private struct SocketChannelLifecycleManager {
         return self.currentState != .closed
     }
 }
+
+func getEnvironmentVar(_ name: String) -> String? {
+    guard let rawValue = getenv(name) else { return nil }
+    return String(validatingUTF8: rawValue)
+}
+
 public func _debugPrint(_ s:String)
 {
-    print("[\(NIOThread.current)] " + s)
+    if getEnvironmentVar("NIO_BSC") != nil {
+        print("[\(NIOThread.current)] " + s)
+    }
 }
 
 /// The base class for all socket-based channels in NIO.

@@ -335,8 +335,16 @@ public class Uring {
         }
     }
 
-    func _debugPrint(_ string : String) -> ()  {
-         print("[\(NIOThread.current)] " + string)
+    func getEnvironmentVar(_ name: String) -> String? {
+        guard let rawValue = getenv(name) else { return nil }
+        return String(validatingUTF8: rawValue)
+    }
+
+    public func _debugPrint(_ s:String)
+    {
+        if getEnvironmentVar("NIO_LINUX") != nil {
+            print("[\(NIOThread.current)] " + s)
+        }
     }
     
     @inline(never)
