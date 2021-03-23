@@ -939,7 +939,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
         self.deregistrationsHappened = false
 
         // temporary workaround to stop us delivering outdated events; possibly set in `deregister`
-        for f in fds where !self.deregistrationsHappened && (f != self.eventFD) { // where !self.deregistrationsHappened
+        for f in fds where !self.deregistrationsHappened && (f.0 != self.eventFD) { // where !self.deregistrationsHappened
             let fd = f.0
             let poll_mask = f.1
 
