@@ -355,7 +355,12 @@ public class Uring {
 //            _debugPrint("io_uring_peek_batch_cqe poll_mask[\(poll_mask)] fd[\(fd)] bitpattern[\(bitPattern)] currentCqeCount [\(currentCqeCount)] result [\(result)]")
 
             switch result {
-                case -ECANCELED: // -ECANCELED for linked adds, so we should add them again
+                case -ECANCELED: // -ECANCELED for streaming polls, should signal error
+                    if let current = fdEvents[fd] {
+                        fdEvents[fd] = ((current.0 | poll_mask), (current.1 | (Uring.POLLHUP | Uring.POLLERR)))
+                    } else {
+                        fdEvents[fd] = (poll_mask, (Uring.POLLHUP | Uring.POLLERR))
+                    }
                     break
                 case -ENOENT:    // -ENOENT returned for failed poll remove
                     break
