@@ -28,7 +28,7 @@ extension DatagramChannelTests {
    static var allTests : [(String, (DatagramChannelTests) -> () throws -> Void)] {
       return [
                 ("testBasicChannelCommunication", testBasicChannelCommunication),
-                ("testManyWrites", testManyWrites),
+// FIXME::                ("testManyWrites", testManyWrites),
                 ("testConnectionFails", testConnectionFails),
                 ("testDatagramChannelHasWatermark", testDatagramChannelHasWatermark),
                 ("testWriteFuturesFailWhenChannelClosed", testWriteFuturesFailWhenChannelClosed),
