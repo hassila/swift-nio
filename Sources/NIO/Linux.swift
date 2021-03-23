@@ -367,7 +367,7 @@ public class Uring {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             let pollError = (Uring.POLLHUP | Uring.POLLERR)
                             if let current = fdEvents[fd] {
-                                fdEvents[fd] |= pollError
+                                fdEvents[fd] = current | pollError
                             } else {
                                 fdEvents[fd] = pollError
                             }
@@ -384,7 +384,7 @@ public class Uring {
                             // _debugPrint("io_uring_peek_batch_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] i[\(i)] poll_mask[\(poll_mask)] currentCqeCount[\(currentCqeCount)]")
                             let uresult = UInt32(result)
                             if let current = fdEvents[fd] {
-                                fdEvents[fd] |=  uresult
+                                fdEvents[fd] =  current | uresult
                             } else {
                                 fdEvents[fd] = uresult
                             }
