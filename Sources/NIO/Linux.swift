@@ -161,7 +161,6 @@ public class Uring {
         
     var cqes : UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>
     var fdEvents = [Int32: (UInt32, UInt32)]() // fd : original_poll_mask, event_poll_return
-    var fdEventsToReregister = [Int32: UInt32]() // fd : poll_mask - used for reregistering failed linked cqes
     var emptyCqe = io_uring_cqe()
 
     func dumpCqes(_ header:String, count: Int)
@@ -282,7 +281,7 @@ public class Uring {
         sqe!.pointee.len |= IORING_POLL_ADD_MULTI;
 
         if submitNow {
-            CNIOLinux_io_uring_submit(&ring)
+            io_uring_flush()
         }
     }
     
@@ -301,20 +300,32 @@ public class Uring {
             CNIOLinux_io_uring_sqe_set_linked(sqe)
         }
         if submitNow {
-            CNIOLinux_io_uring_submit(&ring)
+            io_uring_flush()
         }
     }
 
     @inline(never)
-    public func io_uring_poll_replace(fd: Int32, newPollmask: UInt32, oldPollmask: UInt32) -> () {
-        _debugPrint("io_uring_poll_replace fd[\(fd)] oldPollmask[\(oldPollmask)]  newPollmask[\(newPollmask)]")
+    public func io_uring_poll_update(fd: Int32, newPollmask: UInt32, oldPollmask: UInt32) -> () {
+        _debugPrint("io_uring_poll_update fd[\(fd)] oldPollmask[\(oldPollmask)]  newPollmask[\(newPollmask)]")
 
-        io_uring_prep_poll_remove(fd: fd, poll_mask: oldPollmask, submitNow: false, linkSQE:true)
+    {
+            let sqe = CNIOLinux_io_uring_get_sqe(&ring)
+            let oldBitpattern : Int = Int(Int(oldPollmask) << 32) + Int(fd)
+            let newBitpattern : Int = Int(Int(newPollmask) << 32) + Int(fd)
+            
+            let oldBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(oldBitpattern))
 
-        io_uring_prep_poll_add(fd: fd, poll_mask: newPollmask, submitNow: false)
-        io_uring_flush()
+            
+            CNIOLinux.io_uring_prep_poll_add(sqe, fd, 0)
+            sqe!.pointee.len |= IORING_POLL_ADD_MULTI;       // ask for multiple updates
+            sqe!.pointee.len |= IORING_POLL_UPDATE_EVENTS;   // update existing mask
+            sqe!.pointee.len |= IORING_POLL_UPDATE_USER_DATA;// and update user data
+            sqe!.pointee.addr = oldBitpattern; // old user_data
+            sqe!.pointee.off = newBitpattern; // new user_data
+            CNIOLinux.io_uring_sqe_set_data(sqe, oldBitpatternAsPointer) // FIXME: old poll mask / should be unique symbol for modifies to keep track / be able to handle results
+            sqe!.pointee.poll_events = new_poll_mask; // new poll mask
+            io_uring_flush()
     }
-
 
     func _debugPrint(_ string : String) -> ()  {
          print("[\(NIOThread.current)] " + string)
@@ -322,16 +333,14 @@ public class Uring {
     
     @inline(never)
     public func io_uring_peek_batch_cqe(events: inout [(Int32, UInt32)]) -> Int {
-// print("io_uring_peek_batch_cqe")
+        _debugPrint("io_uring_peek_batch_cqe")
         let currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, UInt32(cqeCount));
-
-        //            dumpCqes("io_uring_peek_batch_cqe currentCqeCount [\(currentCqeCount)] res0 [\(UInt32(cqes[0]!.pointee.res))]")
 
         if currentCqeCount == 0 {
             return 0
         }
         
-//        dumpCqes("io_uring_peek_batch_cqe", count: Int(currentCqeCount))
+        dumpCqes("io_uring_peek_batch_cqe", count: Int(currentCqeCount))
 
         assert(currentCqeCount >= 0, "currentCqeCount should never be negative")
         for i in 0 ..< currentCqeCount
@@ -347,30 +356,14 @@ public class Uring {
 
             switch result {
                 case -ECANCELED: // -ECANCELED for linked adds, so we should add them again
-                    
-                    if let current = fdEventsToReregister[fd] {
-                        fdEventsToReregister[fd] = (current | poll_mask)
-                    } else {
-                        fdEventsToReregister[fd] = poll_mask
-                    }
-
-//                    self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask, submitNow: false) // requires an io_uring_submit later
+                    break
                 case -ENOENT:    // -ENOENT returned for failed poll remove
                     break
                 case -EBADF:
                     break
-/*                    if let current = fdEvents[fd] {
-                        fdEvents[fd] = ((current.0 | poll_mask), (current.1 | Uring.POLLERR))
-                    } else {
-                        fdEvents[fd] = (poll_mask, Uring.POLLERR)
-                    } */
                 case ..<0: // other errors
-                    _debugPrint("fdEventsToReregister setting to nil for fd [\(fd)] result [\(result)]")
-                    fdEventsToReregister[fd] = nil
                     break
                 case 0: // successfull chained add, not an event
-                    _debugPrint("fdEventsToReregister setting to nil for fd [\(fd)] result [\(result)]")
-                    fdEventsToReregister[fd] = nil
                     break
                 default: // positive success
                     // _debugPrint("io_uring_peek_batch_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] i[\(i)] poll_mask[\(poll_mask)] currentCqeCount[\(currentCqeCount)]")
@@ -381,16 +374,10 @@ public class Uring {
                         fdEvents[fd] = (poll_mask, uresult)
                     }
             }
-//            io_uring_cqe_seen(&ring, cqes[Int(i)])
-        }
-
-        for (fd, poll_mask) in fdEventsToReregister {
-            _debugPrint("io_uring_peek_batch_cqe fdEventsToReregister fd [\(fd)] poll_mask [\(poll_mask)]")
-            self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask, submitNow: false)
         }
 
         io_uring_cq_advance(&ring, currentCqeCount) // bulk variant of io_uring_cqe_seen(&ring, dataPointer)
-        io_uring_flush() // and flush any new poll adds if needed
+        io_uring_flush() // and flush any new poll adds if needed, good to advance cq first to make room
 
         // merge all events and actual poll_mask to return
         for (fd, (poll_mask, result_mask)) in fdEvents {
@@ -412,7 +399,6 @@ public class Uring {
 
         }
 
-        fdEventsToReregister.removeAll(keepingCapacity: true)
         fdEvents.removeAll(keepingCapacity: true) // reused for next batch
     
         return events.count
