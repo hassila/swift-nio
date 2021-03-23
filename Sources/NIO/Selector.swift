@@ -865,7 +865,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         assert(interested.contains(.reset), "must register for at least .reset but tried registering for \(interested)")
         try selectable.withUnsafeHandle { fd in
             var reg = registrations[Int(fd)]!
-            _debugPrint("reregister interested \(interested) old \(reg.interested) uringEventSet [\(interested.uringEventSet)] reg.uringEventSet [\(reg.interested.uringEventSet)]")
+            _debugPrint("REregister interested \(interested) old \(reg.interested) uringEventSet [\(interested.uringEventSet)] reg.uringEventSet [\(reg.interested.uringEventSet)]")
 
             ring.io_uring_poll_update(fd: fd, newPollmask: interested.uringEventSet, oldPollmask:reg.interested.uringEventSet)
 
@@ -962,7 +962,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
     //                _debugPrint("wakeup successful 2 fd [\(fd)] val [\(val)]")
             default:
                 if let registration = registrations[Int(fd)] {
-                    _debugPrint("registration \(registration) for fd [\(fd)]")
+                    _debugPrint("We found a registration \(registration) for fd [\(fd)]")
 
                     var selectorEvent = SelectorEventSet(uringEvent: poll_mask)
 //                    let socketClosing = (poll_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false

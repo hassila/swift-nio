@@ -151,7 +151,7 @@ enum CqeEventType : Int {
 
 public class Uring {
     private var ring = io_uring()
-    private let ring_entries: CUnsignedInt = 16384 // 4096
+    private let ring_entries: CUnsignedInt = 4096 // 4096
     private let cqeCount = 10
 
     // FIXME: cqeCount should be bumped to a larger value for deployment, just keeping small for debugging
@@ -172,7 +172,7 @@ public class Uring {
         if count < 0 {
             return
         }
-        _debugPrint(header + " CQE:s [\(cqes)]")
+        _debugPrint(header + " CQE:s [\(cqes)] - ring flags are [\(ring.flags)]")
         for i in 0..<count {
             let c = cqes[i]!.pointee
 
