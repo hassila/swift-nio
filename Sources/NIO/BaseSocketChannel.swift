@@ -1110,16 +1110,8 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
         if (readResult == .none)
         {
             _debugPrint("FORCE CLOSE")
-            if self.lifecycleManager.isActive, try! self.getOption0(ChannelOptions.allowRemoteHalfClosure) {
-                // If we want to allow half closure we will just mark the input side of the Channel
-                // as closed.
-                assert(self.lifecycleManager.isActive)
-                self.pipeline.fireChannelReadComplete0()
-                if self.shouldCloseOnReadError(ChannelError.eof) {
-                    self.close0(error: ChannelError.eof, mode: .input, promise: nil)
-                }
-                _debugPrint("readable0 3sdf")
-            }
+            self.pipeline.fireChannelReadComplete0()
+            self.close0(error: err, mode: .all, promise: nil)
             self.readPending = false
             return .eof
         }
