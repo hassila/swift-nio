@@ -1111,7 +1111,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
         {
             _debugPrint("FORCE CLOSE")
             self.pipeline.fireChannelReadComplete0()
-            self.close0(error: err, mode: .all, promise: nil)
+            self.close0(error: ChannelError.eof, mode: .all, promise: nil)
             self.readPending = false
             return .eof
         }
