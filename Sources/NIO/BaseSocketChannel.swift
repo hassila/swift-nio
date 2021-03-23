@@ -1001,6 +1001,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
                 case .normal(.none):
                     // liburing problem #310
                 //                    preconditionFailure("got .readEOF and read returned not reading any bytes, nor EOF.")
+                    continue loop
                 case .normal(.some):
                     // normal, note that there is no guarantee we're still active (as the user might have closed in callout)
                     continue loop
