@@ -164,7 +164,7 @@ public class Uring {
     public static let POLLHUP: CUnsignedInt = numericCast(CNIOLinux.POLLHUP)
         
     var cqes : UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>
-    var fdEvents = [Int32: (UInt32, UInt32)]() // fd : original_poll_mask, event_poll_return
+    var fdEvents = [Int32: UInt32]() // fd : event_poll_return
     var emptyCqe = io_uring_cqe()
 
     func dumpCqes(_ header:String, count: Int)
@@ -355,7 +355,7 @@ public class Uring {
         {
             let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[Int(i)]))
             let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
-            let eventType = CqeEventType(rawValue:bitPattern >> 32) // shift out the fd
+            let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
             let result = cqes[Int(i)]!.pointee.res
 
             assert(bitPattern > 0, "Bitpattern should never be zero")
@@ -367,9 +367,9 @@ public class Uring {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             let pollError = (Uring.POLLHUP | Uring.POLLERR)
                             if let current = fdEvents[fd] {
-                                fdEvents[fd] = ((current.0 | pollError), (current.1 | pollError))
+                                fdEvents[fd] |= pollError
                             } else {
-                                fdEvents[fd] = (poll_mask, pollError)
+                                fdEvents[fd] = pollError
                             }
                             break
                         case -ENOENT:    // -ENOENT returned for failed poll remove
@@ -384,9 +384,9 @@ public class Uring {
                             // _debugPrint("io_uring_peek_batch_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] i[\(i)] poll_mask[\(poll_mask)] currentCqeCount[\(currentCqeCount)]")
                             let uresult = UInt32(result)
                             if let current = fdEvents[fd] {
-                                fdEvents[fd] = ((current.0 | poll_mask), (current.1 | uresult))
+                                fdEvents[fd] |=  uresult
                             } else {
-                                fdEvents[fd] = (poll_mask, uresult)
+                                fdEvents[fd] = uresult
                             }
                     }
                 case .pollDelete:
@@ -401,12 +401,12 @@ public class Uring {
 //        io_uring_flush() // and flush any new poll adds if needed, good to advance cq first to make room
 
         // merge all events and actual poll_mask to return
-        for (fd, (poll_mask, result_mask)) in fdEvents {
+        for (fd, result_mask) in fdEvents {
 
             let socketClosing = (result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
 
             if (socketClosing == true) {
-                    _debugPrint("socket is going down [\(fd)] [\(poll_mask)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
+                    _debugPrint("socket is going down [\(fd)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
             }
             events.append((fd, result_mask))
         }
