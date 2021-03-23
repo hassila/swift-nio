@@ -1107,14 +1107,14 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
         }
         _debugPrint("readResult [\(readResult)]")
         // FIXME: This block should be removed when uring_io is fixed #310
-        if (readResult == .none)
+/*        if (readResult == .none)
         {
             _debugPrint("FORCE CLOSE")
 //            self.pipeline.fireChannelReadComplete0()
             self.readPending = false
             self.close0(error: ChannelError.eof, mode: .all, promise: nil)
             return .eof
-        }
+        }*/
 //        assert(readResult == .some)
 // FIXME: We hit this assert with uring as we can receive multiple
         // socket accept readiness notifications, if we then fail to
