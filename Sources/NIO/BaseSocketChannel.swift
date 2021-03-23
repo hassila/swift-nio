@@ -1109,8 +1109,6 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
         // FIXME: This block should be removed when uring_io is fixed #310
         if (readResult == .none)
         {
-            readStreamState = .eof
-
             _debugPrint("FORCE CLOSE")
             if self.lifecycleManager.isActive, try! self.getOption0(ChannelOptions.allowRemoteHalfClosure) {
                 // If we want to allow half closure we will just mark the input side of the Channel
@@ -1120,10 +1118,10 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
                 if self.shouldCloseOnReadError(ChannelError.eof) {
                     self.close0(error: ChannelError.eof, mode: .input, promise: nil)
                 }
-                self.readPending = false
                 _debugPrint("readable0 3sdf")
-                return .eof
             }
+            self.readPending = false
+            return .eof
         }
 //        assert(readResult == .some)
 // FIXME: We hit this assert with uring as we can receive multiple
