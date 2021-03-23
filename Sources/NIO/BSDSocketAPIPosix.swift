@@ -25,6 +25,17 @@ extension Shutdown {
         }
     }
 }
+func getEnvironmentVar(_ name: String) -> String? {
+    guard let rawValue = getenv(name) else { return nil }
+    return String(validatingUTF8: rawValue)
+}
+
+public func _debugPrint(_ s:String)
+{
+    if getEnvironmentVar("NIO_BSC") != nil {
+        print("[\(NIOThread.current)] " + s)
+    }
+}
 
 // MARK: Implementation of _BSDSocketProtocol for POSIX systems
 extension NIOBSDSocket {
@@ -41,7 +52,7 @@ extension NIOBSDSocket {
     }
 
     static func close(socket s: NIOBSDSocket.Handle) throws {
-        print("Shutdown socket \(s)")
+        _debugPrint("Shutdown socket \(s)")
         return try Posix.close(descriptor: s)
     }
 
