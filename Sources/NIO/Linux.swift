@@ -286,19 +286,16 @@ public class Uring {
     }
     
     @inline(never)
-    public func io_uring_prep_poll_remove(fd: Int32, poll_mask: UInt32, submitNow: Bool = true, linkSQE: Bool = false) -> () {
+    public func io_uring_prep_poll_remove(fd: Int32, poll_mask: UInt32, submitNow: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
         let bitPattern : Int = Int(Int(poll_mask) << 32) + Int(fd) // stuff poll_mask in upper 4 bytes
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(bitPattern))
 //        _debugPrint("io_uring_prep_poll_remove bitPattern[" + String(bitPattern).decimalToHexa + "] bit[\(bitPattern)] poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))]")
-        _debugPrint("io_uring_prep_poll_remove poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] linkSQE[\(linkSQE)]")
+        _debugPrint("io_uring_prep_poll_remove poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))]")
 
         CNIOLinux.io_uring_prep_poll_remove(sqe, bitpatternAsPointer)
         CNIOLinux.io_uring_sqe_set_data(sqe, bitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
 
-        if linkSQE {
-            CNIOLinux_io_uring_sqe_set_linked(sqe)
-        }
         if submitNow {
             io_uring_flush()
         }
@@ -426,7 +423,6 @@ public class Uring {
                 _debugPrint("io_uring_wait_cqe poll_mask[\(poll_mask)] fd[\(fd)] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
 
                 events.append((fd, UInt32(cqes[0]!.pointee.res)))
-                self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask)
             } else {
                 _debugPrint("io_uring_wait_cqe result [\(result)]")
             }
@@ -466,7 +462,6 @@ public class Uring {
                     _debugPrint("io_uring_wait_cqe_timeout poll_mask[\(poll_mask)] fd[\(fd)] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
 
                     events.append((fd, UInt32(cqes[0]!.pointee.res)))
-                    self.io_uring_prep_poll_add(fd: fd, poll_mask: poll_mask)
                 } else {
                     _debugPrint("io_uring_wait_cqe_timeout result [\(result)]")
                 }
