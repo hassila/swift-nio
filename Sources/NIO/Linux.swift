@@ -314,7 +314,7 @@ public class Uring {
 
 
     func _debugPrint(_ string : String) -> ()  {
-//         print("[\(NIOThread.current)] " + string)
+         print("[\(NIOThread.current)] " + string)
     }
     
     @inline(never)

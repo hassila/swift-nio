@@ -193,7 +193,7 @@ private struct SocketChannelLifecycleManager {
 }
 public func _debugPrint(_ s:String)
 {
-//    print("[\(NIOThread.current)] " + s)
+    print("[\(NIOThread.current)] " + s)
 }
 
 /// The base class for all socket-based channels in NIO.
