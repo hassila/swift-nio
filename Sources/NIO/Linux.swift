@@ -278,6 +278,9 @@ public class Uring {
 
         CNIOLinux.io_uring_prep_poll_add(sqe, fd, poll_mask)
         CNIOLinux.io_uring_sqe_set_data(sqe, bitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
+        sqe.pointee.len |= IORING_POLL_ADD_MULTI;
+
+
         if submitNow {
             CNIOLinux_io_uring_submit(&ring)
         }
