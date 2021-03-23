@@ -146,7 +146,7 @@ extension TimeAmount {
 }
 
 enum CqeEventType : Int {
-    case poll = 1, pollModify, pollDelete
+    case poll = 0, pollModify, pollDelete
 }
 
 public class Uring {
