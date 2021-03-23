@@ -1110,7 +1110,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
         if (readResult == .none)
         {
             _debugPrint("FORCE CLOSE")
-            self.pipeline.fireChannelReadComplete0()
+//            self.pipeline.fireChannelReadComplete0()
             self.close0(error: ChannelError.eof, mode: .all, promise: nil)
             self.readPending = false
             return .eof
