@@ -274,7 +274,7 @@ public class Uring {
     @inline(never)
     public func io_uring_prep_poll_add(fd: Int32, poll_mask: UInt32, submitNow: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
-        let bitPattern : Int = Int(CqeEventType.poll) << 32 + Int(fd)
+        let bitPattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd)
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(bitPattern))
 
         _debugPrint("io_uring_prep_poll_add poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] submitNow[\(submitNow)]")
@@ -293,7 +293,7 @@ public class Uring {
     public func io_uring_prep_poll_remove(fd: Int32, poll_mask: UInt32, submitNow: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
 //        let bitPattern : Int = Int(Int(poll_mask) << 32) + Int(fd) // stuff poll_mask in upper 4 bytes
-        let bitPattern : Int = Int(CqeEventType.poll << 32) + Int(fd)
+        let bitPattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd)
 
 //        let bitPattern : Int = Int(Int(poll_mask) << 32) + Int(fd) // stuff poll_mask in upper 4 bytes
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(bitPattern))
@@ -316,10 +316,10 @@ public class Uring {
 //        let oldBitpattern : Int = Int(Int(oldPollmask) << 32) + Int(fd)
 //        let newBitpattern : Int = Int(Int(newPollmask) << 32) + Int(fd)
 
-        let oldBitpattern : Int = Int (CqeEventType.poll << 32) + Int(fd)
-        let newBitpattern : Int = Int (CqeEventType.poll << 32) + Int(fd)
+        let oldBitpattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd)
+        let newBitpattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd)
 
-        let userbitPattern : Int = Int (CqeEventType.pollModify << 32) + Int(fd)
+        let userbitPattern : Int = Int (CqeEventType.pollModify.rawValue << 32) + Int(fd)
 
         let oldBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(oldBitpattern))
         let userBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(userbitPattern))
