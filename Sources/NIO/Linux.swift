@@ -145,7 +145,7 @@ extension TimeAmount {
     }
 }
 
-enum CqeEventType {
+enum CqeEventType : Int {
     case poll = 1, pollModify, pollDelete
 }
 
@@ -322,7 +322,7 @@ public class Uring {
         let userbitPattern : Int = Int (CqeEventType.pollModify << 32) + Int(fd)
 
         let oldBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(oldBitpattern))
-//        let newBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(newBitpattern))
+        let userBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(userbitPattern))
 
         CNIOLinux.io_uring_prep_poll_add(sqe, fd, 0)
         sqe!.pointee.len |= IORING_POLL_ADD_MULTI       // ask for multiple updates
@@ -330,7 +330,7 @@ public class Uring {
         sqe!.pointee.len |= IORING_POLL_UPDATE_USER_DATA // and update user data
         sqe!.pointee.addr = UInt64(oldBitpattern) // old user_data
         sqe!.pointee.off = UInt64(newBitpattern) // new user_data
-        CNIOLinux.io_uring_sqe_set_data(sqe, userbitPattern)
+        CNIOLinux.io_uring_sqe_set_data(sqe, userBitpatternAsPointer)
         sqe!.pointee.poll_events = UInt16(newPollmask) // new poll mask
         io_uring_flush()
     }
