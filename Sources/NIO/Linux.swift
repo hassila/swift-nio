@@ -274,7 +274,7 @@ public class Uring {
     @inline(never)
     public func io_uring_prep_poll_add(fd: Int32, poll_mask: UInt32, submitNow: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
-        let bitPattern : Int = Int(CqeEventType.poll) << 32 + Int(fd))
+        let bitPattern : Int = Int(CqeEventType.poll) << 32 + Int(fd)
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(bitPattern))
 
         _debugPrint("io_uring_prep_poll_add poll_mask[\(poll_mask)] fd[\(fd)] sqe[\(String(describing:sqe))] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] submitNow[\(submitNow)]")
