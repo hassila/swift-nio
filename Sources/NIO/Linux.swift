@@ -182,7 +182,7 @@ public class Uring {
             let fd = Int(bitPattern & 0x00000000FFFFFFFF)
             let eventType = Int(bitPattern >> 32) // shift out the fd
 
-            _debugPrint("\(i) = \(String(describing:cqes[i])) | user_data [\(c.user_data)] res [\(c.res)] flags [\(c.flags)] fd[\(fd)] eventType[\(CqeEventType(rawValue:poll_mask))]")
+            _debugPrint("\(i) = \(String(describing:cqes[i])) | user_data [\(c.user_data)] res [\(c.res)] flags [\(c.flags)] fd[\(fd)] eventType[\(CqeEventType(rawValue:eventType))]")
         }
     }
     
