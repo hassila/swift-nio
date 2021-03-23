@@ -308,23 +308,22 @@ public class Uring {
     public func io_uring_poll_update(fd: Int32, newPollmask: UInt32, oldPollmask: UInt32) -> () {
         _debugPrint("io_uring_poll_update fd[\(fd)] oldPollmask[\(oldPollmask)]  newPollmask[\(newPollmask)]")
 
-    {
-            let sqe = CNIOLinux_io_uring_get_sqe(&ring)
-            let oldBitpattern : Int = Int(Int(oldPollmask) << 32) + Int(fd)
-            let newBitpattern : Int = Int(Int(newPollmask) << 32) + Int(fd)
-            
-            let oldBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(oldBitpattern))
+        let sqe = CNIOLinux_io_uring_get_sqe(&ring)
+        let oldBitpattern : Int = Int(Int(oldPollmask) << 32) + Int(fd)
+        let newBitpattern : Int = Int(Int(newPollmask) << 32) + Int(fd)
+        
+        let oldBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(oldBitpattern))
 
-            
-            CNIOLinux.io_uring_prep_poll_add(sqe, fd, 0)
-            sqe!.pointee.len |= IORING_POLL_ADD_MULTI;       // ask for multiple updates
-            sqe!.pointee.len |= IORING_POLL_UPDATE_EVENTS;   // update existing mask
-            sqe!.pointee.len |= IORING_POLL_UPDATE_USER_DATA;// and update user data
-            sqe!.pointee.addr = oldBitpattern; // old user_data
-            sqe!.pointee.off = newBitpattern; // new user_data
-            CNIOLinux.io_uring_sqe_set_data(sqe, oldBitpatternAsPointer) // FIXME: old poll mask / should be unique symbol for modifies to keep track / be able to handle results
-            sqe!.pointee.poll_events = new_poll_mask; // new poll mask
-            io_uring_flush()
+        
+        CNIOLinux.io_uring_prep_poll_add(sqe, fd, 0)
+        sqe!.pointee.len |= IORING_POLL_ADD_MULTI;       // ask for multiple updates
+        sqe!.pointee.len |= IORING_POLL_UPDATE_EVENTS;   // update existing mask
+        sqe!.pointee.len |= IORING_POLL_UPDATE_USER_DATA;// and update user data
+        sqe!.pointee.addr = oldBitpattern; // old user_data
+        sqe!.pointee.off = newBitpattern; // new user_data
+        CNIOLinux.io_uring_sqe_set_data(sqe, oldBitpatternAsPointer) // FIXME: old poll mask / should be unique symbol for modifies to keep track / be able to handle results
+        sqe!.pointee.poll_events = new_poll_mask; // new poll mask
+        io_uring_flush()
     }
 
     func _debugPrint(_ string : String) -> ()  {
@@ -334,7 +333,7 @@ public class Uring {
     @inline(never)
     public func io_uring_peek_batch_cqe(events: inout [(Int32, UInt32)]) -> Int {
         _debugPrint("io_uring_peek_batch_cqe")
-        let currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, UInt32(cqeCount));
+        let currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, UInt32(cqeCount))
 
         if currentCqeCount == 0 {
             return 0
@@ -390,13 +389,10 @@ public class Uring {
             events.append((fd, result_mask))
         }
 
-        if events.count > 0
-        {
+        if events.count > 0 {
             _debugPrint("io_uring_peek_batch_cqe returning [\(events.count)] fdEvents [\(fdEvents)]")
-        } else if fdEvents.count > 0
-        {
+        } else if fdEvents.count > 0 {
             _debugPrint("fdEvents.count > 0 but 0 event.count returning [\(events.count)] fdEvents [\(fdEvents)]")
-
         }
 
         fdEvents.removeAll(keepingCapacity: true) // reused for next batch
