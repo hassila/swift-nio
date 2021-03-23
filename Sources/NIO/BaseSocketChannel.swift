@@ -1107,7 +1107,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
         }
         _debugPrint("readResult [\(readResult)]")
         // FIXME: This block should be removed when uring_io is fixed #310
-        if (readResult == .none && )
+        if (readResult == .none)
         {
             
             _debugPrint("FORCE CLOSE")
