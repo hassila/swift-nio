@@ -393,6 +393,8 @@ public class Uring {
                     break
                 case .pollModify:
                     break
+                default:
+                    assertionFailure("Unknown type")
             }
             
         }
