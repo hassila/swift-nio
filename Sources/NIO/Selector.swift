@@ -965,7 +965,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
                     _debugPrint("registration \(registration) for fd [\(fd)]")
 
                     var selectorEvent = SelectorEventSet(uringEvent: poll_mask)
-                    let socketClosing = (poll_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
+//                    let socketClosing = (poll_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
     //                _debugPrint("33333")
 
                 // we can only verify the events for i == 0 as for i > 0 the user might have changed the registrations since then.
