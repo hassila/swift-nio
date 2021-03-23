@@ -1052,7 +1052,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
     private final func readable0() -> ReadStreamState {
         self.eventLoop.assertInEventLoop()
         assert(self.lifecycleManager.isActive)
-        _debugPrint("readable0 1")
+        _debugPrint("readable0 1 \(self)")
 
         defer {
             if self.isOpen && !self.readPending {
