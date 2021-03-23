@@ -876,7 +876,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
  
 public func _debugPrint(_ s:String)
 {
-//    print("[\(NIOThread.current)] " + s)
+    print("[\(NIOThread.current)] " + s)
 }
 
 /// Deregister `Selectable`, must be registered via `register` before.
