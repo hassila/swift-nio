@@ -999,7 +999,8 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
                     assert(!self.lifecycleManager.isPreRegistered)
                     break loop
                 case .normal(.none):
-                    preconditionFailure("got .readEOF and read returned not reading any bytes, nor EOF.")
+                    // liburing problem #310
+                //                    preconditionFailure("got .readEOF and read returned not reading any bytes, nor EOF.")
                 case .normal(.some):
                     // normal, note that there is no guarantee we're still active (as the user might have closed in callout)
                     continue loop
@@ -1105,6 +1106,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
             return readStreamState
         }
         _debugPrint("readResult [\(readResult)]")
+//        if (readResult == .none && )
 //        assert(readResult == .some)
 // FIXME: We hit this assert with uring as we can receive multiple
         // socket accept readiness notifications, if we then fail to
