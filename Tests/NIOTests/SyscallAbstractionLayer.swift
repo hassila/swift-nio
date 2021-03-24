@@ -185,7 +185,7 @@ extension UserKernelInterface {
     }
 }
 
-internal class HookedSelector: NIO.URingSelector<NIORegistration>, UserKernelInterface {
+internal class HookedSelector: URingSelector<NIORegistration>, UserKernelInterface {
     fileprivate let userToKernel: LockedBox<UserToKernel>
     fileprivate let kernelToUser: LockedBox<KernelToUser>
     fileprivate let wakeups: LockedBox<()>
