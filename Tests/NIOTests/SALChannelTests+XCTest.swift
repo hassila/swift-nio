@@ -27,11 +27,11 @@ extension SALChannelTest {
    @available(*, deprecated, message: "not actually deprecated. Just deprecated to allow deprecated tests (which test deprecated functionality) without warnings")
    static var allTests : [(String, (SALChannelTest) -> () throws -> Void)] {
       return [
-// FIXME:                ("testBasicConnectedChannel", testBasicConnectedChannel),
-// FIXME:                ("testWritesFromWritabilityNotificationsDoNotGetLostIfWePreviouslyWroteEverything", testWritesFromWritabilityNotificationsDoNotGetLostIfWePreviouslyWroteEverything),
-        // FIXME:                ("testWeSurviveIfIgnoringSIGPIPEFails", testWeSurviveIfIgnoringSIGPIPEFails),
-        // FIXME:                ("testBasicRead", testBasicRead),
-        // FIXME:                ("testBasicConnectWithClientBootstrap", testBasicConnectWithClientBootstrap),
+               ("testBasicConnectedChannel", testBasicConnectedChannel),
+               ("testWritesFromWritabilityNotificationsDoNotGetLostIfWePreviouslyWroteEverything", testWritesFromWritabilityNotificationsDoNotGetLostIfWePreviouslyWroteEverything),
+              ("testWeSurviveIfIgnoringSIGPIPEFails", testWeSurviveIfIgnoringSIGPIPEFails),
+           ("testBasicRead", testBasicRead),
+                ("testBasicConnectWithClientBootstrap", testBasicConnectWithClientBootstrap),
                         ("testClientBootstrapBindIsDoneAfterSocketOptions", testClientBootstrapBindIsDoneAfterSocketOptions),
            ]
    }
