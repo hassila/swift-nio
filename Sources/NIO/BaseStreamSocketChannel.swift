@@ -137,7 +137,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
     }
 
     final override func writeToSocket() throws -> OverallWriteResult {
-        _debugPrint("writeToSocket fd[\(descriptor)]")
+        _debugPrint("writeToSocket fd[\(self.socket.description)]")
         let result = try self.pendingWrites.triggerAppropriateWriteOperations(scalarBufferWriteOperation: { ptr in
             guard ptr.count > 0 else {
                 // No need to call write if the buffer is empty.
