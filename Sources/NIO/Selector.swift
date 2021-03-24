@@ -998,7 +998,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
 
                     _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(SelectorEventSet(uringEvent: poll_mask))")
 
-                    ring.io_uring_poll_update(fd: fd, newPollmask: registration.interested.uringEventSet, oldPollmask:registration.interested.uringEventSet)
+                    ring.io_uring_poll_update(fd: fd, newPollmask: registration.interested.uringEventSet, oldPollmask:registration.interested.uringEventSet, submitNow:false)
 
                     try body((SelectorEvent(io: selectorEvent, registration: registration)))
                     
@@ -1009,7 +1009,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
             }
         }
 
-//        ring.io_uring_flush() // flush reregisteration of the polls if needed (nop in SQPOLL mode)
+        ring.io_uring_flush() // flush reregisteration of the polls if needed (nop in SQPOLL mode)
         growEventArrayIfNeeded(ready: ready)
     }
 
