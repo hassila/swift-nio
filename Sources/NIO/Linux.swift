@@ -368,8 +368,6 @@ public class Uring {
             let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
             let result = cqes[Int(i)]!.pointee.res
 
-            assert(bitPattern > 0, "Bitpattern should never be zero")
-
 //            _debugPrint("io_uring_peek_batch_cqe poll_mask[\(poll_mask)] fd[\(fd)] bitpattern[\(bitPattern)] currentCqeCount [\(currentCqeCount)] result [\(result)]")
             switch eventType {
                 case .poll:
@@ -384,6 +382,9 @@ public class Uring {
                             break
                         case -ENOENT:    // -ENOENT returned for failed poll remove
                             break
+                        case -EINVAL:
+                            _debugPrint("Failed with -EINVAL for i[\(i)]")
+                            break
                         case -EBADF:
                             break
                         case ..<0: // other errors
@@ -391,6 +392,8 @@ public class Uring {
                         case 0: // successfull chained add, not an event
                             break
                         default: // positive success
+                            assert(bitPattern > 0, "Bitpattern should never be zero")
+
                             // _debugPrint("io_uring_peek_batch_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] i[\(i)] poll_mask[\(poll_mask)] currentCqeCount[\(currentCqeCount)]")
                             let uresult = UInt32(result)
                             if let current = fdEvents[fd] {
