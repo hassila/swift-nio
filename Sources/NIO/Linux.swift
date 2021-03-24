@@ -184,7 +184,7 @@ public class Uring {
 
             let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(bitPattern))
 
-            _debugPrint("\(i) = \(String(describing:cqes[i])) | bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] user_data [\(c.user_data)] res [\(c.res)] flags [\(c.flags)] fd[\(fd)] eventType[\(CqeEventType(rawValue:eventType))]")
+            _debugPrint("\(i) = fd[\(fd)] eventType[\(CqeEventType(rawValue:eventType))] res [\(c.res)] flags [\(c.flags)]  bitpattern[\(String(describing:bitpatternAsPointer))]")
         }
     }
     
@@ -455,7 +455,7 @@ public class Uring {
 
                 events.append((fd, UInt32(cqes[0]!.pointee.res)))
             } else {
-                _debugPrint("io_uring_wait_cqe result [\(result)]")
+                _debugPrint("io_uring_wait_cqe non-positive result poll_mask[\(poll_mask)] fd[\(fd)] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
             }
             CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
         }
@@ -494,7 +494,7 @@ public class Uring {
 
                     events.append((fd, UInt32(cqes[0]!.pointee.res)))
                 } else {
-                    _debugPrint("io_uring_wait_cqe_timeout result [\(result)]")
+                    _debugPrint("io_uring_wait_cqe_timeout non-positive result poll_mask[\(poll_mask)] fd[\(fd)] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
                 }
                 
                 CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])

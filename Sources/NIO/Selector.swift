@@ -60,21 +60,21 @@ struct SelectorEventSet: OptionSet, Equatable {
     /// of flags or to compare against spurious wakeups.
     static let _none = SelectorEventSet([])
 
-    /// Connection reset or other errors.
+    /// Connection reset or other errors. 1
     static let reset = SelectorEventSet(rawValue: 1 << 0)
 
-    /// EOF at the read/input end of a `Selectable`.
+    /// EOF at the read/input end of a `Selectable`.2
     static let readEOF = SelectorEventSet(rawValue: 1 << 1)
 
-    /// Interest in/availability of data to be read
+    /// Interest in/availability of data to be read 4
     static let read = SelectorEventSet(rawValue: 1 << 2)
 
-    /// Interest in/availability of data to be written
+    /// Interest in/availability of data to be written 8
     static let write = SelectorEventSet(rawValue: 1 << 3)
 
     /// EOF at the write/output end of a `Selectable`.
     ///
-    /// - note: This is rarely used because in many cases, there is no signal that this happened.
+    /// - note: This is rarely used because in many cases, there is no signal that this happened. 16
     static let writeEOF = SelectorEventSet(rawValue: 1 << 4)
 
     init(rawValue: SelectorEventSet.RawValue) {
@@ -967,12 +967,12 @@ override func deregister<S: Selectable>(selectable: S) throws {
      // FIXME: Add assertion that only EAGAIN is expected here.
 //                        assert(errorReturn == EAGAIN, "eventfd_read return unexpected errno \(errorReturn)")
 //                        _debugPrint("error wakeup 2 fd [\(fd)] errorReturn [\(errorReturn)] [\(NIOThread.current)]") // THIS IS THE STUFF
-                        _debugPrint("\(errorReturn)")
+//                        _debugPrint("\(errorReturn)")
                     }
     //                _debugPrint("wakeup successful 2 fd [\(fd)] val [\(val)]")
             default:
                 if let registration = registrations[Int(fd)] {
-                    _debugPrint("We found a registration \(registration) for fd [\(fd)]")
+                    _debugPrint("We found a registration for fd [\(fd)]") // \(registration)
 
                     var selectorEvent = SelectorEventSet(uringEvent: poll_mask)
 //                    let socketClosing = (poll_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
