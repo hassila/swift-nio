@@ -997,7 +997,9 @@ override func deregister<S: Selectable>(selectable: S) throws {
                     }
 
                     _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(SelectorEventSet(uringEvent: poll_mask))")
-                    
+
+                    ring.io_uring_poll_update(fd: fd, newPollmask: registration.interested.uringEventSet, oldPollmask:registration.interested.uringEventSet)
+
                     try body((SelectorEvent(io: selectorEvent, registration: registration)))
                     
                } else { // remove any polling if we don't have a registration for it

@@ -398,7 +398,7 @@ public class Uring {
                             } else {
                                 fdEvents[fd] = uresult
                             }
-                            events.append((fd, uresult)) // this
+//                            events.append((fd, uresult)) // this
                     }
                 case .pollDelete:
                     break
@@ -421,7 +421,7 @@ public class Uring {
             if (socketClosing == true) {
                     _debugPrint("socket is going down [\(fd)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
             }
-//            events.append((fd, result_mask)) THAT
+            events.append((fd, result_mask)) // THAT
         }
 
         if events.count > 0 {
