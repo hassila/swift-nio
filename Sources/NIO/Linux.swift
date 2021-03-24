@@ -221,7 +221,7 @@ public class Uring {
         // the kernel and work in progress, but sounds like it would be a better fit and worth trying.
         // Alternatively we could look at limiting number of threads created to numcpu / 2 or so
         // instead of starting one thread per core in the multithreaded event loop
-        if (CNIOLinux.CNIOLinux_io_uring_queue_init(ring_entries, &ring, 0 ) != 0) // IORING_SETUP_IOPOLL | IORING_SETUP_SQPOLL
+        if (CNIOLinux.CNIOLinux_io_uring_queue_init(ring_entries, &ring, IORING_SETUP_CQ_NODROP ) != 0) // IORING_SETUP_IOPOLL | IORING_SETUP_SQPOLL
         
          {
              throw UringError.uringSetupFailure
