@@ -981,28 +981,28 @@ override func deregister<S: Selectable>(selectable: S) throws {
     //            assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
 
                 // in any case we only want what the user is currently registered for & what we got
-                    _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
+//                    _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
                 selectorEvent = selectorEvent.intersection(registration.interested)
-                    _debugPrint("intersection [\(selectorEvent)]")
+//                    _debugPrint("intersection [\(selectorEvent)]")
 
                     if selectorEvent.contains(.readEOF) {
-                        _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
+//                        _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
 
                     }
 
                     guard selectorEvent != ._none else {
-                        _debugPrint("selectorEvent != ._none / [\(selectorEvent)] [\(registration.interested)] [\(SelectorEventSet(uringEvent: poll_mask))] [\(poll_mask)] [\(fd)]")
+//                        _debugPrint("selectorEvent != ._none / [\(selectorEvent)] [\(registration.interested)] [\(SelectorEventSet(uringEvent: poll_mask))] [\(poll_mask)] [\(fd)]")
                         continue
                     }
 
-                    _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(SelectorEventSet(uringEvent: poll_mask))")
+//                    _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(SelectorEventSet(uringEvent: poll_mask))")
 
                     ring.io_uring_poll_update(fd: fd, newPollmask: registration.interested.uringEventSet, oldPollmask:registration.interested.uringEventSet, submitNow:false)
 
                     try body((SelectorEvent(io: selectorEvent, registration: registration)))
                     
                } else { // remove any polling if we don't have a registration for it
-                    _debugPrint("We had no registration for fd [\(fd)] poll_mask [\(poll_mask)] - removing it")
+//                    _debugPrint("We had no registration for fd [\(fd)] poll_mask [\(poll_mask)] - removing it")
 //                    ring.io_uring_prep_poll_remove(fd: fd, poll_mask: poll_mask)
                 }
             }
