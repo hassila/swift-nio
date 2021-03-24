@@ -448,10 +448,10 @@ public class Uring {
             let poll_mask = UInt32(bitPattern >> 32) // shift out the fd
             let result = cqes[0]!.pointee.res
 
-            assert(bitPattern > 0, "Bitpattern should never be zero")
-
             if (result > 0) {
-                 _debugPrint("io_uring_wait_cqe poll_mask[\(poll_mask)] fd[\(fd)] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                assert(bitPattern > 0, "Bitpattern should never be zero")
+
+                _debugPrint("io_uring_wait_cqe poll_mask[\(poll_mask)] fd[\(fd)] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
 
                 events.append((fd, UInt32(cqes[0]!.pointee.res)))
             } else {
