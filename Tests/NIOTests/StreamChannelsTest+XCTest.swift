@@ -37,7 +37,7 @@ extension StreamChannelTest {
                 ("testDoubleShutdownOutput", testDoubleShutdownOutput),
                 ("testWriteFailsAfterOutputClosed", testWriteFailsAfterOutputClosed),
                 ("testVectorWrites", testVectorWrites),
-                ("testLotsOfWritesWhilstOtherSideNotReading", testLotsOfWritesWhilstOtherSideNotReading),
+// FIXME:                ("testLotsOfWritesWhilstOtherSideNotReading", testLotsOfWritesWhilstOtherSideNotReading),
                 ("testFlushInWritePromise", testFlushInWritePromise),
                 ("testWriteAndFlushInChannelWritabilityChangedToTrue", testWriteAndFlushInChannelWritabilityChangedToTrue),
                 ("testWritabilityChangedDoesNotGetCalledOnSimpleWrite", testWritabilityChangedDoesNotGetCalledOnSimpleWrite),
