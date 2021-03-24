@@ -200,7 +200,7 @@ func getEnvironmentVar(_ name: String) -> String? {
 public func _debugPrint(_ s:String)
 {
     if getEnvironmentVar("NIO_BSC") != nil {
-        print("[\(NIOThread.current)] " + s)
+        print("B [\(NIOThread.current)] " + s)
     }
 }
 

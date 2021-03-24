@@ -343,7 +343,7 @@ public class Uring {
     public func _debugPrint(_ s:String)
     {
         if getEnvironmentVar("NIO_LINUX") != nil {
-            print("[\(NIOThread.current)] " + s)
+            print("L [\(NIOThread.current)] " + s)
         }
     }
     
