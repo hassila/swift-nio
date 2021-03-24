@@ -822,7 +822,7 @@ internal class URingSelector<R: Registration>: Selector<R> { // FIXME: should, b
         self.eventFD = try EventFd.eventfd(initval: 0, flags: Int32(EventFd.EFD_CLOEXEC | EventFd.EFD_NONBLOCK))
 
         ring.io_uring_prep_poll_add(fd: self.eventFD, poll_mask: Uring.POLLIN) // wakeups
-printf("UringSelector %d up and running \(self.selectorFD)")
+print("UringSelector %d up and running \(self.selectorFD)")
         self.lifecycleState = .open
     }
 
