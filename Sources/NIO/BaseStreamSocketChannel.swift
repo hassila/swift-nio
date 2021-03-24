@@ -98,7 +98,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
             buffer.clear()
             switch try buffer.withMutableWritePointer(body: { try self.socket.read(pointer: $0) }) {
             case .processed(let bytesRead):
-//                _debugPrint("BSC .processed bytesRead[\(bytesRead)]")
+                _debugPrint("BSC .processed bytesRead[\(bytesRead)]")
                 if bytesRead > 0 {
                     let mayGrow = recvAllocator.record(actualReadBytes: bytesRead)
 
