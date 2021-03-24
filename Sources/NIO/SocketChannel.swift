@@ -531,7 +531,7 @@ final class DatagramChannel: BaseSocketChannel<Socket> {
             }
             switch result {
             case .processed(let bytesRead):
-                _debugPrint(".processed bytesRead[\(bytesRead)]")
+                _debugPrint("SC .processed bytesRead[\(bytesRead)]")
                 assert(bytesRead > 0)
                 assert(self.isOpen)
                 let mayGrow = recvAllocator.record(actualReadBytes: bytesRead)
