@@ -1061,7 +1061,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
     private final func readable0() -> ReadStreamState {
         self.eventLoop.assertInEventLoop()
         assert(self.lifecycleManager.isActive)
-        _debugPrint("readable0 1 \(self)")
+//        _debugPrint("readable0 1 \(self)")
 
         defer {
             if self.isOpen && !self.readPending {
@@ -1072,7 +1072,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
         let readResult: ReadResult
         do {
             readResult = try self.readFromSocket()
-            _debugPrint("readable0 2 readResult[\(readResult)]")
+//            _debugPrint("readable0 2 readResult[\(readResult)]")
         } catch let err {
             let readStreamState: ReadStreamState
             // ChannelError.eof is not something we want to fire through the pipeline as it just means the remote
@@ -1092,7 +1092,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
                         self.close0(error: err, mode: .input, promise: nil)
                     }
                     self.readPending = false
-                    _debugPrint("readable0 3")
+//                    _debugPrint("readable0 3")
                     return .eof
                 }
             } else {
@@ -1102,18 +1102,18 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
 
             // Call before triggering the close of the Channel.
             if readStreamState != .error, self.lifecycleManager.isActive {
-                _debugPrint("readable0 4")
+//                _debugPrint("readable0 4")
                 self.pipeline.fireChannelReadComplete0()
             }
 
             if self.shouldCloseOnReadError(err) {
-                _debugPrint("readable0 5")
+//                _debugPrint("readable0 5")
                 self.close0(error: err, mode: .all, promise: nil)
             }
 
             return readStreamState
         }
-        _debugPrint("readResult [\(readResult)]")
+//        _debugPrint("readResult [\(readResult)]")
         // FIXME: This block should be removed when uring_io is fixed #310
 /*        if (readResult == .none)
         {

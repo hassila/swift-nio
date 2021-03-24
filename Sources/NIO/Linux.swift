@@ -358,7 +358,7 @@ public class Uring {
             return 0
         }
         
-        dumpCqes("io_uring_peek_batch_cqe", count: Int(currentCqeCount))
+//        dumpCqes("io_uring_peek_batch_cqe", count: Int(currentCqeCount))
 
         assert(currentCqeCount >= 0, "currentCqeCount should never be negative")
         for i in 0 ..< currentCqeCount

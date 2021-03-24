@@ -777,7 +777,6 @@ internal class Selector<R: Registration> {
 
     /* attention, this may (will!) be called from outside the event loop, ie. can't access mutable shared state (such as `self.open`) */
     func wakeup() throws {
-_debugPrint("wakeup")
         assert(NIOThread.current != self.myThread)
         try self.externalSelectorFDLock.withLock {
             #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
@@ -799,7 +798,7 @@ _debugPrint("wakeup")
                     throw EventLoopError.shutdown
                 }
             _ = try EventFd.eventfd_write(fd: self.eventFD, value: 1)
-            _debugPrint("eventfd_write done for eventfd_write [\(self.eventFD)]")
+//            _debugPrint("eventfd_write done for eventfd_write [\(self.eventFD)]")
            #endif
         }
     }
@@ -845,7 +844,7 @@ print("UringSelector %d up and running \(self.selectorFD)")
         try selectable.withUnsafeHandle { fd in
             assert(registrations[Int(fd)] == nil)
             
-            _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
+//            _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
          ring.io_uring_prep_poll_add(fd: fd, poll_mask: interested.uringEventSet)
 
             registrations[Int(fd)] = makeRegistration(interested)
@@ -865,7 +864,7 @@ print("UringSelector %d up and running \(self.selectorFD)")
         assert(interested.contains(.reset), "must register for at least .reset but tried registering for \(interested)")
         try selectable.withUnsafeHandle { fd in
             var reg = registrations[Int(fd)]!
-            _debugPrint("REregister interested \(interested) old \(reg.interested) uringEventSet [\(interested.uringEventSet)] reg.uringEventSet [\(reg.interested.uringEventSet)]")
+//            _debugPrint("REregister interested \(interested) old \(reg.interested) uringEventSet [\(interested.uringEventSet)] reg.uringEventSet [\(reg.interested.uringEventSet)]")
 
             ring.io_uring_poll_update(fd: fd, newPollmask: interested.uringEventSet, oldPollmask:reg.interested.uringEventSet)
 
@@ -903,7 +902,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
         guard let reg = registrations.removeValue(forKey: Int(fd)) else {
             return
         }
-        _debugPrint("deregister interested \(reg) reg.interested.uringEventSet [\(reg.interested.uringEventSet)]")
+//        _debugPrint("deregister interested \(reg) reg.interested.uringEventSet [\(reg.interested.uringEventSet)]")
         ring.io_uring_prep_poll_remove(fd: fd, poll_mask: reg.interested.uringEventSet)
     }
 }
@@ -929,7 +928,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
         case .blockUntilTimeout(let timeAmount):
             ready = try Int(ring.io_uring_wait_cqe_timeout(events: &fds, timeout:timeAmount))
         case .block:
-            _debugPrint("whenReady.block")
+//            _debugPrint("whenReady.block")
             ready = Int(ring.io_uring_peek_batch_cqe(events: &fds)) // first try to consume any existing
 
             if (ready <= 0)   // otherwise block (only single supported, but we will empty cqe next run around...
@@ -940,7 +939,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
 
        if (ready > 0)
         {
-            _debugPrint("fds: \(fds) ")
+//            _debugPrint("fds: \(fds) ")
         }
         // start with no deregistrations happened
         self.deregistrationsHappened = false
@@ -953,11 +952,11 @@ override func deregister<S: Selectable>(selectable: S) throws {
             if self.deregistrationsHappened && fd != self.eventFD {
                     break
             }
-            _debugPrint("for f in fds \(f.0) \(f.1), self.deregistrationsHappened [\(self.deregistrationsHappened)]")
+//            _debugPrint("for f in fds \(f.0) \(f.1), self.deregistrationsHappened [\(self.deregistrationsHappened)]")
             // If the registration is not in the Map anymore we deregistered it during the processing of whenReady(...). In this case just skipit.
             switch fd {
             case self.eventFD:
-               _debugPrint("wakeup successful fd [\(fd)] [\(NIOThread.current)]")
+//               _debugPrint("wakeup successful fd [\(fd)] [\(NIOThread.current)]")
                     var val = EventFd.eventfd_t()
                     do {
                         _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
@@ -972,7 +971,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
     //                _debugPrint("wakeup successful 2 fd [\(fd)] val [\(val)]")
             default:
                 if let registration = registrations[Int(fd)] {
-                    _debugPrint("We found a registration for fd [\(fd)]") // \(registration)
+//                    _debugPrint("We found a registration for fd [\(fd)]") // \(registration)
 
                     var selectorEvent = SelectorEventSet(uringEvent: poll_mask)
 //                    let socketClosing = (poll_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false

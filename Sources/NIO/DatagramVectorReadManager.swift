@@ -127,7 +127,7 @@ struct DatagramVectorReadManager {
             // We've set up our pointers, it's time to get going. We now issue the call.
             return try socket.recvmmsg(msgs: self.messageVector)
         }
-        _debugPrint("DVM result [\(result)]")
+//        _debugPrint("DVM result [\(result)]")
         switch result {
         case .wouldBlock(let messagesProcessed):
             assert(messagesProcessed == 0)
