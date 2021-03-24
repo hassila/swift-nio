@@ -1005,7 +1005,9 @@ override func deregister<S: Selectable>(selectable: S) throws {
                 }
             }
         }
-
+        if (self.deregistrationsHappened) {
+          _debugPrint("deregistrationsHappened")
+        }
         ring.io_uring_flush() // flush reregisteration of the polls if needed (nop in SQPOLL mode)
         growEventArrayIfNeeded(ready: ready)
     }
