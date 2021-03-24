@@ -1007,6 +1007,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
                     assert(!self.lifecycleManager.isPreRegistered)
                     break loop
                 case .normal(.none):
+                    // FIXME: We fail on this condition with uring on some tests
                     preconditionFailure("got .readEOF and read returned not reading any bytes, nor EOF.")
                 case .normal(.some):
                     // normal, note that there is no guarantee we're still active (as the user might have closed in callout)

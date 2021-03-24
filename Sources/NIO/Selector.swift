@@ -947,13 +947,13 @@ override func deregister<S: Selectable>(selectable: S) throws {
         self.deregistrationsHappened = false
 
         // temporary workaround to stop us delivering outdated events; possibly set in `deregister`
-        for f in fds { // where (!self.deregistrationsHappened && (f.0 != self.eventFD)) { // where !self.deregistrationsHappened
+        for f in fds where !self.deregistrationsHappened { // where (!self.deregistrationsHappened && (f.0 != self.eventFD)) { // where !self.deregistrationsHappened
             let fd = f.0
             let poll_mask = f.1
             
-            if self.deregistrationsHappened && fd != self.eventFD {
-                    break
-            }
+          //  if self.deregistrationsHappened && fd != self.eventFD {
+           //         break
+          //  }
             _debugPrint("for f in fds \(f.0) \(f.1), self.deregistrationsHappened [\(self.deregistrationsHappened)]")
             // If the registration is not in the Map anymore we deregistered it during the processing of whenReady(...). In this case just skipit.
             switch fd {
