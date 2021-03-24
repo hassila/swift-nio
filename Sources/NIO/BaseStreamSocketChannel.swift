@@ -143,10 +143,12 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                 // No need to call write if the buffer is empty.
                 return .processed(0)
             }
+            _debugPrint("writeToSocket ptr.count[\(ptr.count)]")
             // normal write
             return try self.socket.write(pointer: ptr)
         }, vectorBufferWriteOperation: { ptrs in
             // Gathering write
+            _debugPrint("writeToSocket writev ptrs[\(ptrs)]")
             try self.socket.writev(iovecs: ptrs)
         }, scalarFileWriteOperation: { descriptor, index, endIndex in
             try self.socket.sendFile(fd: descriptor, offset: index, count: endIndex - index)
