@@ -393,14 +393,12 @@ public class Uring {
                         default: // positive success
                             assert(bitPattern > 0, "Bitpattern should never be zero")
 
-                             _debugPrint("io_uring_peek_batch_cqe bitPattern[" + String(bitPattern).decimalToHexa + "]  bit[\(bitPattern)] fd[\(fd)] i[\(i)] poll_mask[\(poll_mask)] currentCqeCount[\(currentCqeCount)]")
                             let uresult = UInt32(result)
                             if let current = fdEvents[fd] {
                                 fdEvents[fd] =  current | uresult
                             } else {
                                 fdEvents[fd] = uresult
                             }
-//                            events.append((fd, uresult)) // this
                     }
                 case .pollDelete:
                     break
@@ -413,7 +411,6 @@ public class Uring {
         }
 
         io_uring_cq_advance(&ring, currentCqeCount) // bulk variant of io_uring_cqe_seen(&ring, dataPointer)
-//        io_uring_flush() // and flush any new poll adds if needed, good to advance cq first to make room
 
         // merge all events and actual poll_mask to return
         for (fd, result_mask) in fdEvents {
@@ -423,7 +420,7 @@ public class Uring {
             if (socketClosing == true) {
                  _debugPrint("socket is going down [\(fd)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
             }
-            events.append((fd, result_mask)) // THAT
+            events.append((fd, result_mask))
         }
 
         if events.count > 0 {
