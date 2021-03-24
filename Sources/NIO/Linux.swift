@@ -257,6 +257,9 @@ public class Uring {
             retval = CNIOLinux_io_uring_submit(&ring)
             submissiontimes += 1
 
+            // FIXME: We will fail here if the rings ar too small, one of the allocation
+            // tests required 1K ring size minimum to run as it was doing registration
+            // mask notification repeatedly in a loop...
             if submissiontimes > 1 {
                 if (retval == -EAGAIN)
                 {
