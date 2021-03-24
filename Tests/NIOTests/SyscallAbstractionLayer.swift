@@ -185,7 +185,7 @@ extension UserKernelInterface {
     }
 }
 
-internal class HookedSelector: URingSelector<NIORegistration>, UserKernelInterface {
+internal class HookedSelector: NIO.Selector<NIORegistration>, UserKernelInterface {
     fileprivate let userToKernel: LockedBox<UserToKernel>
     fileprivate let kernelToUser: LockedBox<KernelToUser>
     fileprivate let wakeups: LockedBox<()>
@@ -194,7 +194,7 @@ internal class HookedSelector: URingSelector<NIORegistration>, UserKernelInterfa
         self.userToKernel = userToKernel
         self.kernelToUser = kernelToUser
         self.wakeups = wakeups
-        try super.init(sharedInitializationOnly:true)
+        try super.init()
     }
 
     override func register<S: Selectable>(selectable: S,
