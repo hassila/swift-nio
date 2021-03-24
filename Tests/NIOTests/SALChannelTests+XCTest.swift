@@ -32,7 +32,7 @@ extension SALChannelTest {
         // FIXME:                ("testWeSurviveIfIgnoringSIGPIPEFails", testWeSurviveIfIgnoringSIGPIPEFails),
         // FIXME:                ("testBasicRead", testBasicRead),
         // FIXME:                ("testBasicConnectWithClientBootstrap", testBasicConnectWithClientBootstrap),
-        // FIXME:                ("testClientBootstrapBindIsDoneAfterSocketOptions", testClientBootstrapBindIsDoneAfterSocketOptions),
+                        ("testClientBootstrapBindIsDoneAfterSocketOptions", testClientBootstrapBindIsDoneAfterSocketOptions),
            ]
    }
 }
