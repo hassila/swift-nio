@@ -1071,8 +1071,8 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
 
         let readResult: ReadResult
         do {
-            _debugPrint("readable0 2")
             readResult = try self.readFromSocket()
+            _debugPrint("readable0 2 readResult[\(readResult)]")
         } catch let err {
             let readStreamState: ReadStreamState
             // ChannelError.eof is not something we want to fire through the pipeline as it just means the remote
