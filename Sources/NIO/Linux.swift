@@ -152,7 +152,7 @@ enum CqeEventType : Int {
 public class Uring {
     private var ring = io_uring()
     private let ring_entries: CUnsignedInt = 64 // 4096
-    private let cqeCount = ring_entries
+    private let cqeCount = 64
 
     // FIXME: cqeCount should be bumped to a larger value for deployment, just keeping small for debugging
     //    private let cqeCount = 10000
