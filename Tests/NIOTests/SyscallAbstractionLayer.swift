@@ -194,7 +194,7 @@ internal class HookedSelector: NIO.Selector<NIORegistration>, UserKernelInterfac
         self.userToKernel = userToKernel
         self.kernelToUser = kernelToUser
         self.wakeups = wakeups
-        try super.init()
+        try super.init(sharedInitializationOnly:true)
     }
 
     override func register<S: Selectable>(selectable: S,
