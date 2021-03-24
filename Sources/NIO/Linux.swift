@@ -182,7 +182,9 @@ public class Uring {
             let fd = Int(bitPattern & 0x00000000FFFFFFFF)
             let eventType = Int(bitPattern >> 32) // shift out the fd
 
-            _debugPrint("\(i) = \(String(describing:cqes[i])) | user_data [\(c.user_data)] res [\(c.res)] flags [\(c.flags)] fd[\(fd)] eventType[\(CqeEventType(rawValue:eventType))]")
+            let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(bitPattern))
+
+            _debugPrint("\(i) = \(String(describing:cqes[i])) | bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] user_data [\(c.user_data)] res [\(c.res)] flags [\(c.flags)] fd[\(fd)] eventType[\(CqeEventType(rawValue:eventType))]")
         }
     }
     
@@ -319,7 +321,7 @@ public class Uring {
         let oldBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(oldBitpattern))
         let userBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(userbitPattern))
 
-        _debugPrint("io_uring_poll_update fd[\(fd)] oldPollmask[\(oldPollmask)]  newPollmask[\(newPollmask)] oldBitpatternAsPointer[\(String(describing:oldBitpatternAsPointer))] userBitpatternAsPointer[\(String(describing:userBitpatternAsPointer))] userbitPattern[\(String(describing:userbitPattern))]")
+        _debugPrint("io_uring_poll_update fd[\(fd)] oldPollmask[\(oldPollmask)] newPollmask[\(newPollmask)] oldBitpatternAsPointer[\(String(describing:oldBitpatternAsPointer))] userBitpatternAsPointer[\(String(describing:userBitpatternAsPointer))]")
 
         CNIOLinux.io_uring_prep_poll_add(sqe, fd, 0)
         sqe!.pointee.len |= IORING_POLL_ADD_MULTI       // ask for multiple updates
