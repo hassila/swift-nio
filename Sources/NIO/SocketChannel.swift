@@ -559,6 +559,8 @@ final class DatagramChannel: BaseSocketChannel<Socket> {
                 return readResult
             }
         }
+        _debugPrint("singleReadFromSocket readResult[\(readResult)]")
+
         return readResult
     }
 
@@ -605,6 +607,7 @@ final class DatagramChannel: BaseSocketChannel<Socket> {
                 break readLoop
             }
         }
+        _debugPrint("vector read readResult[\(readResult)]")
 
         return readResult
         #else
