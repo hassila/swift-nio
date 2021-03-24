@@ -806,7 +806,7 @@ _debugPrint("wakeup")
 }
 
 
-final internal class URingSelector<R: Registration>: Selector<R> {
+internal class URingSelector<R: Registration>: Selector<R> { // FIXME: should, but can't be final due to SAL tests...
 #if os(Linux)
     private typealias EventType = Uring
 
