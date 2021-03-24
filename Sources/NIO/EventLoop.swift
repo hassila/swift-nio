@@ -1113,7 +1113,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
         let callingThread = NIOThread.current
         MultiThreadedEventLoopGroup.runTheLoop(thread: callingThread,
                                                canEventLoopBeShutdownIndividually: true,
-                                               selectorFactory: selectorFactory,
+                                               selectorFactory: MultiThreadedEventLoopGroup.selectorFactory,
                                                initializer: { _ in }) { loop in
             loop.assertInEventLoop()
             callback(loop)
