@@ -27,7 +27,7 @@ extension EchoServerClientTest {
    @available(*, deprecated, message: "not actually deprecated. Just deprecated to allow deprecated tests (which test deprecated functionality) without warnings")
    static var allTests : [(String, (EchoServerClientTest) -> () throws -> Void)] {
       return [
-// FIXME:                ("testEcho", testEcho),
+                ("testEcho", testEcho),
                 ("testLotsOfUnflushedWrites", testLotsOfUnflushedWrites),
                 ("testEchoUnixDomainSocket", testEchoUnixDomainSocket),
                 ("testConnectUnixDomainSocket", testConnectUnixDomainSocket),

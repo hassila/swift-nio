@@ -48,7 +48,7 @@ extension BootstrapTest {
                 ("testDatagramBootstrapRejectsNotWorkingELGsCorrectly", testDatagramBootstrapRejectsNotWorkingELGsCorrectly),
                 ("testNIOPipeBootstrapValidatesWorkingELGsCorrectly", testNIOPipeBootstrapValidatesWorkingELGsCorrectly),
                 ("testNIOPipeBootstrapRejectsNotWorkingELGsCorrectly", testNIOPipeBootstrapRejectsNotWorkingELGsCorrectly),
-// FIXME:                ("testConvenienceOptionsAreEquivalentUniversalClient", testConvenienceOptionsAreEquivalentUniversalClient),
+                ("testConvenienceOptionsAreEquivalentUniversalClient", testConvenienceOptionsAreEquivalentUniversalClient),
                 ("testClientBindWorksOnSocketsBoundToEitherIPv4OrIPv6Only", testClientBindWorksOnSocketsBoundToEitherIPv4OrIPv6Only),
            ]
    }
