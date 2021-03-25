@@ -888,7 +888,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
             }
             return try NIO.URingSelector<NIORegistration>.init()
         } catch  {
-            print("Failed URingSelector")
+//            print("Failed URingSelector")
         }
         #endif
         return try NIO.Selector<NIORegistration>.init()
