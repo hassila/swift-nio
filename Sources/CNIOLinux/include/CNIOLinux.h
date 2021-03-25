@@ -87,9 +87,12 @@ size_t CNIOLinux_CMSG_LEN(size_t);
 size_t CNIOLinux_CMSG_SPACE(size_t);
 #endif // __linux__
 
-#include "liburing_stubs.h" // including this  to quiet compiler warning about empty includes
-#include "liburing_nio.h"
+// including all here to quiet compiler warnings
+
 #include "io_uring.h" // we pull in a local copy for the sqe/cqe structs and flags
 #include "barrier.h" // we pull in a local copy for the sqe/cqe structs and flags
+
+#include "liburing_stubs.h"
+#include "liburing_nio.h"
 
 #endif
