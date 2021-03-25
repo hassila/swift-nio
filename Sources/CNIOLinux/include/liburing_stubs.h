@@ -31,7 +31,7 @@ struct io_uring {};
 struct io_uring_params {};
 struct io_uring_cqe {};
 struct io_uring_probe {};
-struct io_uring_sqe { int flags; };
+struct io_uring_sqe {};
 struct io_uring_restriction {};
 struct statx {}; // FIXME: should include proper header instead, man page include doesnt work as expected, need investigation
 struct open_how {}; // FIXME: should include proper header instead, but doesnt seem to exist on older distros
