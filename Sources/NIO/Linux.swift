@@ -119,22 +119,7 @@ enum UringError: Error {
     case uringWaitCqeFailure
     case uringWaitCqeTimeoutFailure
 }
-/*
-extension StringProtocol {
-    var drop0xPrefix: SubSequence { hasPrefix("0x") ? dropFirst(2) : self[...] }
-    var drop0bPrefix: SubSequence { hasPrefix("0b") ? dropFirst(2) : self[...] }
-    var hexaToDecimal: Int { Int(drop0xPrefix, radix: 16) ?? 0 }
-    var hexaToBinary: String { .init(hexaToDecimal, radix: 2) }
-    var decimalToHexa: String { .init(Int(self) ?? 0, radix: 16) }
-    var decimalToBinary: String { .init(Int(self) ?? 0, radix: 2) }
-    var binaryToDecimal: Int { Int(drop0bPrefix, radix: 2) ?? 0 }
-    var binaryToHexa: String { .init(binaryToDecimal, radix: 16) }
-}
-extension BinaryInteger {
-    var binary: String { .init(self, radix: 2) }
-    var hexa: String { .init(self, radix: 16) }
-}
-*/
+
 extension TimeAmount {
     public func kernelTimespec() -> __kernel_timespec {
         var ts = __kernel_timespec()
@@ -150,16 +135,14 @@ enum CqeEventType : Int {
 
 public class Uring {
     private var ring = io_uring()
-    private let ring_entries: CUnsignedInt = 8192 // 4096
-    private let cqeCount = 4096
-
-    // FIXME: cqeCount should be bumped to a larger value for deployment, just keeping small for debugging
-    //    private let cqeCount = 10000
+    // FIXME: These should be tunable somewhere, somehow. Maybe environment vars are ok, need to discuss with SwiftNIO team.
+    private let ringEntries: CUnsignedInt = 8192 // this is a very large number due to some of the test that does 1K registration mods
+    private let cqeMaxCount = 4096 // shouldn't be more than ringEntries, this is the max chunk of CQE we take.
 
     public static let POLLIN: CUnsignedInt = numericCast(CNIOLinux.POLLIN)
     public static let POLLOUT: CUnsignedInt = numericCast(CNIOLinux.POLLOUT)
     public static let POLLERR: CUnsignedInt = numericCast(CNIOLinux.POLLERR)
-    public static let POLLRDHUP: CUnsignedInt = numericCast(CNIOLinux.EPOLLRDHUP.rawValue) // FIXME: - POLLRDHUP not available on ubuntu headers?!
+    public static let POLLRDHUP: CUnsignedInt = numericCast(CNIOLinux.EPOLLRDHUP.rawValue) // FIXME: - POLLRDHUP not in ubuntu headers?!
     public static let POLLHUP: CUnsignedInt = numericCast(CNIOLinux.POLLHUP)
         
     var cqes : UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>
@@ -188,8 +171,8 @@ public class Uring {
     }
     
     init() {
-        cqes = UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>.allocate(capacity: cqeCount)
-        cqes.initialize(repeating:&emptyCqe, count:cqeCount)
+        cqes = UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>.allocate(capacity: cqeMaxCount)
+        cqes.initialize(repeating:&emptyCqe, count:cqeMaxCount)
     }
     
     deinit {
@@ -198,10 +181,9 @@ public class Uring {
     
    @inline(never)
     public static func io_uring_load() throws -> () {
-//        throw UringError.loadFailure // force epoll
             if (CNIOLinux.CNIOLinux_io_uring_load() != 0)
             {
-                throw UringError.loadFailure
+                throw UringError.loadFailure // this will force epoll() to be used instead
             }
         }
 
@@ -211,65 +193,76 @@ public class Uring {
 
     @inline(never)
     public func io_uring_queue_init() throws -> () {
-        // FIXME: IORING_SETUP_SQPOLL is basically useless in default configuraiton as it starts one kernel
+        // FIXME: IORING_SETUP_SQPOLL is currently basically useless in default configuraiton as it starts one kernel
         // poller thread per ring. It is possible to regulate this by sharing a kernel thread for the polling
         // with IORING_SETUP_ATTACH_WQ, but it requires the first ring to be setup with polling and then the
-        // fd shared with later rings. Not very convenient or clean really. A New setup option is in the works
-        // IORING_SETUP_SQPOLL_PERCPU which together with IORING_SETUP_SQ_AFF will be possible to use to
-        // bind the kernel poller thread to a given cpu (and share one amongst all rings) - not yet in
-        // the kernel and work in progress, but sounds like it would be a better fit and worth trying.
+        // fd shared with later rings. Not very convenient or easy to use really.
+        // A New setup option is in the works IORING_SETUP_SQPOLL_PERCPU which together with IORING_SETUP_SQ_AFF
+        // will be possible to use to bind the kernel poller thread to a given cpu (and share one amongst all rings)
+        // - not yet in the kernel and work in progress, but should be a better fit and worth trying.
         // Alternatively we could look at limiting number of threads created to numcpu / 2 or so
         // instead of starting one thread per core in the multithreaded event loop
-        if (CNIOLinux.CNIOLinux_io_uring_queue_init(ring_entries, &ring, 0 ) != 0) // IORING_SETUP_IOPOLL | IORING_SETUP_SQPOLL
-        
+        // or allowing customization of whether to use SQPOLL somewhere higher up.
+        // Also, current IORING_SETUP_SQPOLL requires correct privileges to run (root or specific privs set)
+        if (CNIOLinux.CNIOLinux_io_uring_queue_init(ringEntries, &ring, 0 ) != 0) // IORING_SETUP_SQPOLL
          {
              throw UringError.uringSetupFailure
          }
         
-        _debugPrint("uring setup \(self.ring.ring_fd)")
-//        print("uring setup \(self.ring.ring_fd)")
+        _debugPrint("io_uring_queue_init \(self.ring.ring_fd)")
      }
   
     public func io_uring_queue_exit() {
-        _debugPrint("exit uring  \(self.ring.ring_fd)")
+        _debugPrint("io_uring_queue_exit \(self.ring.ring_fd)")
         CNIOLinux_io_uring_queue_exit(&ring)
     }
 
-    /*
-        Ok, this was a real bummer - turns out that flushing multiple SQE:s
-        can fail midflight and this will actually happen when e.g. a socket
-        has gone down and we are re-regsitering poll for both the socket fd
-        and e.g. eventfd - this means we will silently lose any entries after the
-        failed fd. Ouch. Proper approach is to use io_uring_sq_ready() in a loop.
-        See: https://github.com/axboe/liburing/issues/309
-    */
+    //   Ok, this was a real bummer - turns out that flushing multiple SQE:s
+    //   can fail midflight and this will actually happen for real when e.g. a socket
+    //   has gone down and we are re-registering polls this means we will silently lose any
+    //   entries after the failed fd. Ouch. Proper approach is to use io_uring_sq_ready() in a loop.
+    //   See: https://github.com/axboe/liburing/issues/309
             
+    //   FIXME: NB we can get stuck in this flush for synthetic test that does a massive
+    //   amount of registration modifications. Basically, this is due to back pressure from uring
+    //   to make us reap CQE:s as the CQE queue would be full with responses. To avoid this
+    //   we should either limit the amount of outbound operations we generate before reaping
+    //   CQE:S, or run with IORING_SETUP_SQPOLL (then we would not get stuck here, as the kernel
+    //   would simply stop reading SQE:s if the CQE queue is full, we would then instead get
+    //   stuck trying to get a new SQE, which also would be a problem.). So, better limit amount
+    //   of generated outbound operations sent and allow us to reap CQE:s somehow.
+    //   Current workaround is to set up a fairly big ring size to avoid getting stuck, but
+    //   that gives us worse locality of reference for the memory used by the ring, so worse
+    //   cache behavior. Should be revisited, probably a more reasonable size of the ring
+    //   would be in the hundreds rather than thousands.
+    
     public func io_uring_flush() {         // When using SQPOLL this is just a NOP
         _debugPrint("io_uring_flush")
 
-        var submissiontimes = 0
+        var submissions = 0
         var retval : Int32
         
         // FIXME:  it may return -EAGAIN or -ENOMEM when there is not enough memory to do internal allocations.
+        //   See: https://github.com/axboe/liburing/issues/309
         while (CNIOLinux_io_uring_sq_ready(&ring) > 0)
         {
             retval = CNIOLinux_io_uring_submit(&ring)
-            submissiontimes += 1
+            submissions += 1
 
             // FIXME: We will fail here if the rings ar too small, one of the allocation
             // tests required 1K ring size minimum to run as it was doing registration
             // mask notification repeatedly in a loop...
-            if submissiontimes > 1 {
+            if submissions > 1 {
                 if (retval == -EAGAIN)
                 {
-                    _debugPrint("io_uring_flush io_uring_submit -EAGAIN \(submissiontimes)")
+                    _debugPrint("io_uring_flush io_uring_submit -EAGAIN \(submissions)")
 
                 }
                 if (retval == -ENOMEM)
                 {
-                    _debugPrint("io_uring_flush io_uring_submit -ENOMEM \(submissiontimes)")
+                    _debugPrint("io_uring_flush io_uring_submit -ENOMEM \(submissions)")
                 }
-                _debugPrint("io_uring_flush io_uring_submit needed \(submissiontimes)")
+                _debugPrint("io_uring_flush io_uring_submit needed \(submissions)")
             }
         }
     }
@@ -352,23 +345,23 @@ public class Uring {
     @inline(never)
     public func io_uring_peek_batch_cqe(events: inout [(Int32, UInt32)]) -> Int {
         _debugPrint("io_uring_peek_batch_cqe")
-        let currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, UInt32(cqeCount))
+        let currentcqeMaxCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, UInt32(cqeMaxCount))
 
-        if currentCqeCount == 0 {
+        if currentcqeMaxCount == 0 {
             return 0
         }
         
-//        dumpCqes("io_uring_peek_batch_cqe", count: Int(currentCqeCount))
+//        dumpCqes("io_uring_peek_batch_cqe", count: Int(currentcqeMaxCount))
 
-        assert(currentCqeCount >= 0, "currentCqeCount should never be negative")
-        for i in 0 ..< currentCqeCount
+        assert(currentcqeMaxCount >= 0, "currentcqeMaxCount should never be negative")
+        for i in 0 ..< currentcqeMaxCount
         {
             let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[Int(i)]))
             let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
             let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
             let result = cqes[Int(i)]!.pointee.res
 
-//            _debugPrint("io_uring_peek_batch_cqe poll_mask[\(poll_mask)] fd[\(fd)] bitpattern[\(bitPattern)] currentCqeCount [\(currentCqeCount)] result [\(result)]")
+//            _debugPrint("io_uring_peek_batch_cqe poll_mask[\(poll_mask)] fd[\(fd)] bitpattern[\(bitPattern)] currentcqeMaxCount [\(currentcqeMaxCount)] result [\(result)]")
             switch eventType {
                 case .poll:
                     switch result {
@@ -411,7 +404,7 @@ public class Uring {
             
         }
 
-        io_uring_cq_advance(&ring, currentCqeCount) // bulk variant of io_uring_cqe_seen(&ring, dataPointer)
+        io_uring_cq_advance(&ring, currentcqeMaxCount) // bulk variant of io_uring_cqe_seen(&ring, dataPointer)
 
         // merge all events and actual poll_mask to return
         for (fd, result_mask) in fdEvents {
