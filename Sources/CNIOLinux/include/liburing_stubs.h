@@ -22,8 +22,6 @@
 
 #ifdef __linux__
 
-// FIXME: Remove this warning after bringup
-#warning "liburing not available, using epoll"
 #include <stdbool.h>  // bool
 #include <linux/time_types.h> // struct __kernel_timespec
 
