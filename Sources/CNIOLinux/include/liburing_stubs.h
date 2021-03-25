@@ -27,16 +27,64 @@
 #include <stdbool.h>  // bool
 #include <linux/time_types.h> // struct __kernel_timespec
 #include "io_uring.h" // we pull in a local copy for the sqe/cqe structs and flags
-struct io_uring {};
+
+// these are pulled in from liburing.h to allow us to manipulate flags etc
+// directly, but we cant take the header as it defines extern c functions.
+
+struct io_uring_sq {
+    unsigned *khead;
+    unsigned *ktail;
+    unsigned *kring_mask;
+    unsigned *kring_entries;
+    unsigned *kflags;
+    unsigned *kdropped;
+    unsigned *array;
+    struct io_uring_sqe *sqes;
+
+    unsigned sqe_head;
+    unsigned sqe_tail;
+
+    size_t ring_sz;
+    void *ring_ptr;
+
+    unsigned pad[4];
+};
+
+struct io_uring_cq {
+    unsigned *khead;
+    unsigned *ktail;
+    unsigned *kring_mask;
+    unsigned *kring_entries;
+    unsigned *kflags;
+    unsigned *koverflow;
+    struct io_uring_cqe *cqes;
+
+    size_t ring_sz;
+    void *ring_ptr;
+
+    unsigned pad[4];
+};
+
+struct io_uring {
+    struct io_uring_sq sq;
+    struct io_uring_cq cq;
+    unsigned flags;
+    int ring_fd;
+
+    unsigned features;
+    unsigned pad[3];
+};
+
 /*
 struct io_uring_params {};
 struct io_uring_cqe {};
 struct io_uring_probe {};
 struct io_uring_sqe {};
 struct io_uring_restriction {};
+ */
 struct statx {}; // FIXME: should include proper header instead, man page include doesnt work as expected, need investigation
 struct open_how {}; // FIXME: should include proper header instead, but doesnt seem to exist on older distros
-*/
+
 static inline int io_uring_opcode_supported(const struct io_uring_probe *p, int op) { return 0; }
 static inline void io_uring_cq_advance(struct io_uring *ring, unsigned nr) { return; }
 static inline void io_uring_cqe_seen(struct io_uring *ring, struct io_uring_cqe *cqe) { return; }
