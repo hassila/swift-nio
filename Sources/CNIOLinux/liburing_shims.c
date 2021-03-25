@@ -134,7 +134,7 @@ static struct _liburing_functions_t
 // dynamically load liburing and resolve symbols. Should be called once before using io_uring.
 // returns 0 on successful loading and resolving of functions, otherwise error
 
-// getting kernel version, just adopted from SO.
+// getting kernel version, just adopted from SO answer.
 int _check_compatible_kernel_version() {
     struct utsname buffer;
     char *p;
@@ -144,12 +144,6 @@ int _check_compatible_kernel_version() {
     if (uname(&buffer) != 0) {
         return -1;
     }
-
-    printf("system name = %s\n", buffer.sysname);
-    printf("node name   = %s\n", buffer.nodename);
-    printf("release     = %s\n", buffer.release);
-    printf("version     = %s\n", buffer.version);
-    printf("machine     = %s\n", buffer.machine);
 
     p = buffer.release;
 
@@ -162,9 +156,13 @@ int _check_compatible_kernel_version() {
         }
     }
 
-    printf("Kernel %d Major %d Minor %d Patch %d\n", ver[0], ver[1], ver[2], ver[3]);
+// FIXME: Should replace these with actual kernel version where multishot poll is integrated, likely 5.13
+    if ((ver[0] > 5) || ((ver[0] == 5) && (ver[1] >= 13))) {
+        return 0;
+    }
 
-    return 0;
+    fprintf(stderr, "Trying to run with liburing on unsupported kernel version %ld.%ld", ver[0], ver[1]);
+    return -1;
 }
 
 int CNIOLinux_io_uring_load()
