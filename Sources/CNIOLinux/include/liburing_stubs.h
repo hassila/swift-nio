@@ -153,7 +153,7 @@ int __io_uring_get_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr, uns
 
 // stubs for inlined functions
 static inline struct io_uring_sqe *CNIOLinux_io_uring_get_sqe(struct io_uring *ring) { return NULL; }
-static inline int CNIOLinux_io_uring_submit(struct io_uring *ring) { return; }
+static inline int CNIOLinux_io_uring_submit(struct io_uring *ring) { return 0; }
 static inline int CNIOLinux_io_uring_wait_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr) {return 0;}
 static void CNIOLinux_io_uring_sqe_set_linked(struct io_uring_sqe *sqe) { return; }
 
