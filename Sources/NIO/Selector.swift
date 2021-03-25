@@ -340,17 +340,17 @@ internal class Selector<R: Registration> {
     fileprivate var lifecycleState: SelectorLifecycleState = .initializing
 
     #if os(macOS) || os(iOS) || os(watchOS) || os(tvOS)
-    fileprivate typealias EventType = kevent
+    private typealias EventType = kevent
     #else
-    fileprivate typealias EventType = Epoll.epoll_event
-    fileprivate var earliestTimer: NIODeadline = .distantFuture
+    private typealias EventType = Epoll.epoll_event
+    private var earliestTimer: NIODeadline = .distantFuture
     #endif
 
     private var eventsCapacity = 64
-    fileprivate var events: UnsafeMutablePointer<EventType>
+    private var events: UnsafeMutablePointer<EventType>
     fileprivate var registrations = [Int: R]()
     // temporary workaround to stop us delivering outdated events; read in `whenReady`, set in `deregister`
-    private var deregistrationsHappened: Bool = false
+    fileprivate var deregistrationsHappened: Bool = false
 
     private let externalSelectorFDLock = Lock()
     // The rules for `self.selectorFD`, `self.eventFD`, and `self.timerFD`:
@@ -359,7 +359,7 @@ internal class Selector<R: Registration> {
     fileprivate var selectorFD: CInt = -1 // -1 == we're closed
     #if os(Linux) || os(Android)
     fileprivate var eventFD: CInt = -1 // -1 == we're closed
-    fileprivate var timerFD: CInt = -1 // -1 == we're closed
+    private var timerFD: CInt = -1 // -1 == we're closed
     #endif
     fileprivate let myThread: NIOThread
 
@@ -797,15 +797,14 @@ internal class Selector<R: Registration> {
                 guard self.eventFD >= 0 else {
                     throw EventLoopError.shutdown
                 }
-            _ = try EventFd.eventfd_write(fd: self.eventFD, value: 1)
-            _debugPrint("eventfd_write done for eventfd_write [\(self.eventFD)]")
-           #endif
+                _ = try EventFd.eventfd_write(fd: self.eventFD, value: 1)
+            #endif
         }
     }
 }
 
 
-internal class URingSelector<R: Registration>: Selector<R> { // FIXME: should, but can't be final due to SAL tests...
+final internal class URingSelector<R: Registration>: Selector<R> {
 #if os(Linux)
     private typealias EventType = Uring
 
