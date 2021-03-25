@@ -58,7 +58,7 @@ public class Uring {
     private var ring = io_uring()
     // FIXME: These should be tunable somewhere, somehow. Maybe environment vars are ok, need to discuss with SwiftNIO team.
     private let ringEntries: CUnsignedInt = 8192 // this is a very large number due to some of the test that does 1K registration mods
-    private let cqeMaxCount = 4096 // shouldn't be more than ringEntries, this is the max chunk of CQE we take.
+    private let cqeMaxCount : UInt32 = 4096 // shouldn't be more than ringEntries, this is the max chunk of CQE we take.
         
     var cqes : UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>
     var fdEvents = [Int32: UInt32]() // fd : event_poll_return
@@ -329,12 +329,12 @@ public class Uring {
         io_uring_cq_advance(&ring, currentCqeCount) // bulk variant of io_uring_cqe_seen(&ring, dataPointer)
 
         //  return single event per fd
-        let i = 0
+        var count = 0
         for (fd, result_mask) in fdEvents {
-            assert(i < maxevents)
-            events[i].fd = fd
-            events[i].pollMask = result_mask
-            i++
+            assert(count < maxevents)
+            events[count].fd = fd
+            events[count].pollMask = result_mask
+            count+=1
 /*
             let socketClosing = (result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
 
@@ -344,15 +344,15 @@ public class Uring {
  */
         }
 
-        if i > 0 {
-            _debugPrint("io_uring_peek_batch_cqe returning [\(i)] events")
+        if count > 0 {
+            _debugPrint("io_uring_peek_batch_cqe returning [\(count)] events")
         } else if fdEvents.count > 0 {
-            _debugPrint("fdEvents.count > 0 but 0 event.count returning [\(i)]")
+            _debugPrint("fdEvents.count > 0 but 0 event.count returning [\(count)]")
         }
 
         fdEvents.removeAll(keepingCapacity: true) // reused for next batch
     
-        return events.count
+        return count
     }
 
     @inline(never)

@@ -921,17 +921,17 @@ override func deregister<S: Selectable>(selectable: S) throws {
         switch strategy {
         case .now:
             _debugPrint("whenReady.now")
-            ready = Int(ring.io_uring_peek_batch_cqe(events: events, maxevents: Int32(eventsCapacity)))
+            ready = Int(ring.io_uring_peek_batch_cqe(events: events, maxevents: UInt32(eventsCapacity)))
         case .blockUntilTimeout(let timeAmount):
             _debugPrint("whenReady.blockUntilTimeout")
-            ready = try Int(ring.io_uring_wait_cqe_timeout(events: events, maxevents: Int32(eventsCapacity), timeout:timeAmount))
+            ready = try Int(ring.io_uring_wait_cqe_timeout(events: events, maxevents: UInt32(eventsCapacity), timeout:timeAmount))
         case .block:
             _debugPrint("whenReady.block")
-            ready = Int(ring.io_uring_peek_batch_cqe(events: events, maxevents: Int32(eventsCapacity))) // first try to consume any existing
+            ready = Int(ring.io_uring_peek_batch_cqe(events: events, maxevents: UInt32(eventsCapacity))) // first try to consume any existing
 
             if (ready <= 0)   // otherwise block (only single supported, but we will empty cqe next run around...
             {
-                ready = try ring.io_uring_wait_cqe(events: events, maxevents: Int32(eventsCapacity))
+                ready = try ring.io_uring_wait_cqe(events: events, maxevents: UInt32(eventsCapacity))
             }
         }
 
