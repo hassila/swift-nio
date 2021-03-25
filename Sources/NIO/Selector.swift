@@ -822,7 +822,7 @@ internal class URingSelector<R: Registration>: Selector<R> { // FIXME: should, b
 
         ring.io_uring_prep_poll_add(fd: self.eventFD, poll_mask: Uring.POLLIN) // wakeups
         self.lifecycleState = .open
-        _debugPrint("UringSelector %d up and running \(self.selectorFD)")
+        _debugPrint("UringSelector up and running \(self.selectorFD)")
     }
 
     deinit {
@@ -965,10 +965,10 @@ override func deregister<S: Selectable>(selectable: S) throws {
                         // some explanation is in order. we need to specifically reregister
                         // the polling of the eventfd descriptor
                     }
-//                    catch let errorReturn {
+                    catch let errorReturn {
      // FIXME: Add assertion that only EAGAIN is expected here.
 //                        assert(errorReturn == EAGAIN, "eventfd_read return unexpected errno \(errorReturn)")
-//                    }
+                    }
             default:
                 if let registration = registrations[Int(fd)] {
                     _debugPrint("We found a registration for fd [\(fd)]") // \(registration)
