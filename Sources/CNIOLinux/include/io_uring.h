@@ -2,7 +2,7 @@
 // (liburing will be disabled then though)
 #ifdef __linux__
 
-#ifdef C_NIO_LIBURING_UNAVAILABLE // this is to quiet compiler warnings for umbrella headers
+#ifdef C_NIO_LIBURING_UNAVAILABLE // only pull in these definitions if liburing isn't actually available
 
 /* SPDX-License-Identifier: (GPL-2.0 WITH Linux-syscall-note) OR MIT */
 /*

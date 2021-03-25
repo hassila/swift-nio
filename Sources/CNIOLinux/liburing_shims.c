@@ -170,7 +170,8 @@ int CNIOLinux_io_uring_load()
     
     // first a number of sanity checks, did we compile with actual liburing headers?
 #ifdef C_NIO_LIBURING_UNAVAILABLE
-    fprintf(stderr, "WARNING: Tried to enable liburing for SwiftNIO that ws compiled without liburing support.\n");
+// FIXME: Remove this after bringup, yields unnecessary noise on epoll platforms.
+    fprintf(stderr, "WARNING: Tried to enable liburing for SwiftNIO which was compiled without liburing support.\n");
     return -1;
 #endif
 
