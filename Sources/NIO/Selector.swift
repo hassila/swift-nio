@@ -350,9 +350,9 @@ internal class Selector<R: Registration> {
     fileprivate var events: UnsafeMutablePointer<EventType>
     fileprivate var registrations = [Int: R]()
     // temporary workaround to stop us delivering outdated events; read in `whenReady`, set in `deregister`
-    fileprivate var deregistrationsHappened: Bool = false
+    private var deregistrationsHappened: Bool = false
 
-    fileprivate let externalSelectorFDLock = Lock()
+    private let externalSelectorFDLock = Lock()
     // The rules for `self.selectorFD`, `self.eventFD`, and `self.timerFD`:
     // reads: `self.externalSelectorFDLock` OR access from the EventLoop thread
     // writes: `self.externalSelectorFDLock` AND access from the EventLoop thread
