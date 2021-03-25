@@ -25,7 +25,12 @@
 // resolved successfully, otherwise returns -1
 int CNIOLinux_io_uring_load();
 
-// Only after a successful CNIOLinux_io_uring_load the below functions may be used
+// After a successful CNIOLinux_io_uring_load the below functions may be used
+// We expose more functionality from liburing than what is currently used
+// by SwiftNIO to make it easier to expand the usage in the future if desired.
+// These functions are fundamentally the same as exposed by liburing
+// so please refer to any documentation there.
+// https://unixism.net/loti/ is also decent, if not comprehensive.
 
 struct io_uring_probe *CNIOLinux_io_uring_get_probe_ring(struct io_uring *ring);
 struct io_uring_probe *CNIOLinux_io_uring_get_probe(void);
@@ -76,7 +81,7 @@ int CNIOLinux___io_uring_get_cqe(struct io_uring *ring,
                   struct io_uring_cqe **cqe_ptr, unsigned submit,
                   unsigned wait_nr, sigset_t *sigmask);
 
-// inlined functions
+// The rest are inlined functions which are not dynamically resolved
 int CNIOLinux_io_uring_wait_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr);
 unsigned CNIOLinux_io_uring_sq_ready(const struct io_uring *ring);
 void CNIOLinux_io_uring_sqe_set_linked(struct io_uring_sqe *sqe);

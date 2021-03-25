@@ -15,12 +15,15 @@
 #ifndef LIBURING_STUBS_H
 #define LIBURING_STUBS_H
 
-#ifdef C_NIO_LIBURING_DISABLED // only read below stubs if liburing headers were missing
+// only read below stubs if liburing headers were missing
+// stubs are needed to build on systems lacking liburing
+
+#ifdef C_NIO_LIBURING_UNAVAILABLE
 
 #ifdef __linux__
 
-// TODO: Remove this warning after bringup
-#warning "liburing headers not available on build host, using internal stubs and disabling liburing"
+// FIXME: Remove this warning after bringup
+#warning "liburing not available, using epoll"
 #include <stdbool.h>  // bool
 #include <linux/time_types.h> // struct __kernel_timespec
 
@@ -30,8 +33,8 @@ struct io_uring_cqe {};
 struct io_uring_probe {};
 struct io_uring_sqe {};
 struct io_uring_restriction {};
-struct statx {}; // should include proper header instead, man page include doesnt work as expected, need investigation
-struct open_how {}; // should include proper header instead, but doesnt seem to exist on older distros
+struct statx {}; // FIXME: should include proper header instead, man page include doesnt work as expected, need investigation
+struct open_how {}; // FIXME: should include proper header instead, but doesnt seem to exist on older distros
 
 static inline int io_uring_opcode_supported(const struct io_uring_probe *p, int op) { return 0; }
 static inline void io_uring_cq_advance(struct io_uring *ring, unsigned nr) { return; }
@@ -152,8 +155,10 @@ int __io_uring_get_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr, uns
 static inline extern struct io_uring_sqe *CNIOLinux_io_uring_get_sqe(struct io_uring *ring) { return NULL; }
 static inline void CNIOLinux_io_uring_submit(struct io_uring *ring) { return; }
 static inline int CNIOLinux_io_uring_wait_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr) {return 0;}
+static unsigned CNIOLinux_io_uring_sq_ready(const struct io_uring *ring) { return 0; }
+static void CNIOLinux_io_uring_sqe_set_linked(struct io_uring_sqe *sqe) { return; }
 
-#endif /* C_NIO_LIBURING_DISABLED */
+#endif /* C_NIO_LIBURING_UNAVAILABLE */
 
 #endif /* __linux__ */
 

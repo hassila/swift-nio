@@ -26,13 +26,17 @@
 #include <netinet/ip.h>
 #include <poll.h>
 
-// Pull in io_uring if it's availble (Linux kernel 5.1+ systems, best performance with 5.11+)
-// https://github.com/axboe/liburing/issues/189#issuecomment-778304899
+// Pull in io_uring if it's availble - liburing must be
+// installed on both development and deployment machines
+// https://github.com/axboe/liburing
+// The Linux kernel needs to be 5.13+ (not yet clear)
+// as we use the poll multishot functionality from
+// https://github.com/axboe/liburing/issues/310
 
 #if __has_include(<liburing.h>)
 #include <liburing.h>
 #else
-#define C_NIO_LIBURING_DISABLED // liburing will be disabled (falling back on epoll)
+#define C_NIO_LIBURING_UNAVAILABLE // liburing will be disabled (falling back on epoll)
 #endif
 
 // Some explanation is required here.
@@ -83,7 +87,7 @@ size_t CNIOLinux_CMSG_LEN(size_t);
 size_t CNIOLinux_CMSG_SPACE(size_t);
 #endif // __linux__
 
-#include "liburing_stubs.h" // including this for both cases to quiet compiler warning
+#include "liburing_stubs.h" // including this  to quiet compiler warning about empty includes
 #include "liburing_nio.h"
 
 #endif

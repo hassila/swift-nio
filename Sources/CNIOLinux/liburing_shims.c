@@ -12,6 +12,14 @@
 //
 //===----------------------------------------------------------------------===//
 
+// Interface to liburing, uses dlopen/dlsym to provide access to the library
+// functions to allow running on platforms without liburing. Capturing
+// inline functions too at the end (they typically only manipulate structs
+// directly and could be used directly using CNIOLinux.xxx, but wrapped here for
+// unification and completeness).
+
+// FIXME: Check if this is needed, copied from shim.c to
+// avoid possible problems due to:
 // Xcode's Archive builds with Xcode's Package support struggle with empty .c files
 // (https://bugs.swift.org/browse/SR-12939).
 void CNIOLinux_i_do_nothing_just_working_around_a_darwin_toolchain_bug2(void) {}
@@ -27,11 +35,13 @@ void CNIOLinux_i_do_nothing_just_working_around_a_darwin_toolchain_bug2(void) {}
 #include <unistd.h>
 #include <assert.h>
 #include <dlfcn.h>
-
-// io_uring
+#include <stdlib.h>
+#include <errno.h>
+#include <ctype.h>
+#include <sys/utsname.h>
 
 // local typedefs for readability of function pointers
-// these should match the signatures in liburing.h
+// these should exactly match the signatures in liburing.h
 typedef struct io_uring_probe *(*io_uring_get_probe_ring_fp)(struct io_uring *ring);
 typedef struct io_uring_probe *(*io_uring_get_probe_fp)(void);
 typedef void (*io_uring_free_probe_fp)(struct io_uring_probe *probe);
@@ -78,7 +88,7 @@ typedef int (*__io_uring_get_cqe_fp)(struct io_uring *ring,
                   struct io_uring_cqe **cqe_ptr, unsigned submit,
                   unsigned wait_nr, sigset_t *sigmask);
 
-// local static struct holding resolved function pointers for liburing
+// local static struct holding resolved function pointers from dlsym
 static struct _liburing_functions_t
 {
     io_uring_get_probe_ring_fp io_uring_get_probe_ring;
@@ -112,9 +122,7 @@ static struct _liburing_functions_t
     __io_uring_get_cqe_fp __io_uring_get_cqe;
 } liburing_functions;
 
-// dynamically load liburing and resolve symbols. Should be called once before using io_uring.
-// returns 0 on successful loading and resolving of functions, otherwise error
-
+// Convenience macro for resolving
 #define _DL_RESOLVE(symbol) \
     liburing_functions.symbol = (symbol ## _fp) dlsym(dl_handle, #symbol);  \
     if ((err = dlerror()) != NULL) {  \
@@ -123,11 +131,41 @@ static struct _liburing_functions_t
         return -1;  \
     }
 
-/*\
-    else {  \
-        printf("Resolved "  #symbol " from liburing, %p\n", liburing_functions.symbol);  \
+// dynamically load liburing and resolve symbols. Should be called once before using io_uring.
+// returns 0 on successful loading and resolving of functions, otherwise error
+
+// getting kernel version, just adopted from SO.
+int _check_compatible_kernel_version() {
+    struct utsname buffer;
+    char *p;
+    long ver[16];
+    int i=0;
+
+    if (uname(&buffer) != 0) {
+        return -1;
     }
-*/
+
+    printf("system name = %s\n", buffer.sysname);
+    printf("node name   = %s\n", buffer.nodename);
+    printf("release     = %s\n", buffer.release);
+    printf("version     = %s\n", buffer.version);
+    printf("machine     = %s\n", buffer.machine);
+
+    p = buffer.release;
+
+    while (*p) {
+        if (isdigit(*p)) {
+            ver[i] = strtol(p, &p, 10);
+            i++;
+        } else {
+            p++;
+        }
+    }
+
+    printf("Kernel %d Major %d Minor %d Patch %d\n", ver[0], ver[1], ver[2], ver[3]);
+
+    return 0;
+}
 
 int CNIOLinux_io_uring_load()
 {
@@ -137,10 +175,13 @@ int CNIOLinux_io_uring_load()
         // fail if we didn't link with actual development headers
         // possibly warn here that someone tried to enable uring
         // while we hadn't compiled with the real headers
-#ifdef C_NIO_LIBURING_DISABLED
+#ifdef C_NIO_LIBURING_UNAVAILABLE
     return -1;
 #endif
     
+    if (_check_compatible_kernel_version() != 0) {
+        return -1;
+    }
     dlerror(); // canonical way of clearing dlerror
     dl_handle = dlopen("liburing.so", RTLD_LAZY);
     if (((err = dlerror()) != NULL) || !dl_handle) {
