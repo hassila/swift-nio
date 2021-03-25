@@ -151,11 +151,6 @@ static inline int io_uring_wait_cqe(struct io_uring *ring,
 int __io_uring_get_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr, unsigned submit,
                        unsigned wait_nr, sigset_t *sigmask) { return 0; }
 
-// stubs for inlined functions
-static inline struct io_uring_sqe *CNIOLinux_io_uring_get_sqe(struct io_uring *ring) { return NULL; }
-// static inline int CNIOLinux_io_uring_submit(struct io_uring *ring) { return 0; }
-// static inline int CNIOLinux_io_uring_wait_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr) {return 0;}
-
 #endif /* C_NIO_LIBURING_UNAVAILABLE */
 
 #endif /* __linux__ */
