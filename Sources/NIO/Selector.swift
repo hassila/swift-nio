@@ -965,7 +965,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
                         // some explanation is in order. we need to specifically reregister
                         // the polling of the eventfd descriptor
                     }
-                    catch let _ { // errorReturn
+                    catch { // errorReturn
      // FIXME: Add assertion that only EAGAIN is expected here.
 //                        assert(errorReturn == EAGAIN, "eventfd_read return unexpected errno \(errorReturn)")
                     }
