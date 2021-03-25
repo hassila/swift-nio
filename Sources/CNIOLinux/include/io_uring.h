@@ -1,3 +1,7 @@
+// from liburing project, local copy needed for builds on linux platforms without liburing installed
+// (liburing will be disabled then though)
+#ifdef __linux__
+
 /* SPDX-License-Identifier: (GPL-2.0 WITH Linux-syscall-note) OR MIT */
 /*
  * Header file for the io_uring interface.
@@ -378,6 +382,8 @@ struct io_uring_getevents_arg {
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 
 #endif
