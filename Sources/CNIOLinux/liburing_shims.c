@@ -116,8 +116,6 @@ static struct _liburing_functions_t
     io_uring_register_probe_fp io_uring_register_probe;
     io_uring_register_personality_fp io_uring_register_personality;
     io_uring_unregister_personality_fp io_uring_unregister_personality;
-//    io_uring_register_restrictions_fp io_uring_register_restrictions;
-//    io_uring_enable_rings_fp io_uring_enable_rings;
     __io_uring_sqring_wait_fp __io_uring_sqring_wait;
     __io_uring_get_cqe_fp __io_uring_get_cqe;
 } liburing_functions;
@@ -157,11 +155,11 @@ int _check_compatible_kernel_version() {
     }
 
 // FIXME: Should replace these with actual kernel version where multishot poll is integrated, likely 5.13
-    if ((ver[0] > 5) || ((ver[0] == 5) && (ver[1] >= 13))) {
+    if ((ver[0] > 5) || ((ver[0] == 5) && (ver[1] >= 12))) {
         return 0;
     }
 
-    fprintf(stderr, "Trying to run with liburing on unsupported kernel version %ld.%ld", ver[0], ver[1]);
+    fprintf(stderr, "Trying to run with liburing on unsupported kernel version %ld.%ld\n", ver[0], ver[1]);
     return -1;
 }
 
@@ -170,24 +168,34 @@ int CNIOLinux_io_uring_load()
     void *dl_handle;
     const char *err;
     
-        // fail if we didn't link with actual development headers
-        // possibly warn here that someone tried to enable uring
-        // while we hadn't compiled with the real headers
+    // first a number of sanity checks, did we compile with actual liburing headers?
 #ifdef C_NIO_LIBURING_UNAVAILABLE
+    fprintf(stderr, "WARNING: Tried to enable liburing for SwiftNIO that ws compiled without liburing support.\n");
     return -1;
 #endif
-    
+
+    // are we running on a compatible kernel version
     if (_check_compatible_kernel_version() != 0) {
         return -1;
     }
-    dlerror(); // canonical way of clearing dlerror
-    dl_handle = dlopen("liburing.so", RTLD_LAZY);
-    if (((err = dlerror()) != NULL) || !dl_handle) {
-        printf("WARNING: Failed to load liburing.so, using epoll() instead. [%s] [%p]\n", err?err:"Unknown reason", dl_handle);
+    
+    // FIXME: Should document this somewhere
+    // have we manually diabled liburing?
+    if (getenv("SWIFTNIO_DISABLE_URING") != NULL) // Just an esacpe hatch - allows testing with epoll
+    {
+        fprintf(stderr, "SWIFTNIO_DISABLE_URING set, disabling liburing.\n");
         return -1;
     }
     
-        // try to resolve all symbols we need
+    // then we can finally try to load the library and resolve all symbols
+    dlerror(); // canonical way of clearing dlerror
+    dl_handle = dlopen("liburing.so", RTLD_LAZY);
+    if (((err = dlerror()) != NULL) || !dl_handle) {
+        fprintf(stderr, "WARNING: Failed to load liburing.so, using epoll() instead. [%s] [%p]\n", err?err:"Unknown reason", dl_handle);
+        return -1;
+    }
+    
+     // try to resolve all symbols we need, macro will fail with -1 if unsuccessful
     _DL_RESOLVE(io_uring_get_probe_ring);
     _DL_RESOLVE(io_uring_get_probe);
     _DL_RESOLVE(io_uring_free_probe);
@@ -213,21 +221,14 @@ int CNIOLinux_io_uring_load()
     _DL_RESOLVE(io_uring_register_probe);
     _DL_RESOLVE(io_uring_register_personality);
     _DL_RESOLVE(io_uring_unregister_personality);
-//    _DL_RESOLVE(io_uring_register_restrictions); FIXME - resolve failed
-//    _DL_RESOLVE(io_uring_enable_rings); FIXME - resolve failed - they are not in .so, checked with nm.
     _DL_RESOLVE(__io_uring_sqring_wait);
     _DL_RESOLVE(__io_uring_get_cqe);
-    
-        // functions that aren't dynamically resolvable as
-        // they are defined static inline in liburing.h
-        // they are manually stubbed in CNIOLinux.h for platforms without uring
-        // so we can call the liburing-header defined one directly below
-        // _DL_RESOLVE(io_uring_cqe_seen);
-    
+        
     return 0;
 }
 
-    // ring setup/teardown
+// And the wrappers, should never be called unless we've done CNIOLinux_io_uring_load once first.
+
 struct io_uring_probe *CNIOLinux_io_uring_get_probe_ring(struct io_uring *ring)
 {
     return liburing_functions.io_uring_get_probe_ring(ring);
@@ -300,31 +301,29 @@ int CNIOLinux_io_uring_submit_and_wait(struct io_uring *ring, unsigned wait_nr)
     return liburing_functions.io_uring_submit_and_wait(ring, wait_nr);
 }
 
+
+// Adopting some retry code from queue.c from liburing with slight
+// modifications - we never want to have to handle retries of
+// SQE allocation in all places it could possibly occur.
+//
+// If the SQ ring is full, we may need to submit IO first
+
 struct io_uring_sqe *CNIOLinux_io_uring_get_sqe(struct io_uring *ring)
 {
-    /*
-     * Adopting some retry code from queue.c from liburing with slight
-     * modifications - we never want to have to handle retries of
-     * SQE allocation in all places it could possibly occur.
-     *
-     * If the SQ ring is full, we may need to submit IO first
-     */
-    struct io_uring_sqe *sqe = liburing_functions.io_uring_get_sqe(ring);
+    struct io_uring_sqe *sqe;
     int ret;
     
-    while (!sqe) {
+    while (!(sqe = liburing_functions.io_uring_get_sqe(ring))) {
         ret = CNIOLinux_io_uring_submit(ring);
-
         assert(ret >= 0);
-
-        sqe = liburing_functions.io_uring_get_sqe(ring);
-// FIXME: When adding support for SQPOLL we should use this for waiting here instead/also
-            // static inline int io_uring_sqring_wait(struct io_uring *ring)
     }
+    
+    // FIXME: When adding support for SQPOLL we should probably
+    // should use this for waiting inside the loop instead/also
+    // static inline int io_uring_sqring_wait(struct io_uring *ring)
 
     return sqe;
 }
-
 
 int CNIOLinux_io_uring_register_buffers(struct io_uring *ring,
                     const struct iovec *iovecs,
@@ -386,40 +385,13 @@ int CNIOLinux_io_uring_unregister_personality(struct io_uring *ring, int id)
     return liburing_functions.io_uring_unregister_personality(ring, id);
 }
 
-int CNIOLinux_io_uring_register_restrictions(struct io_uring *ring,
-                      struct io_uring_restriction *res,
-                      unsigned int nr_res)
-{
-    return 0;
-  //  return liburing_functions.io_uring_register_restrictions(ring, res, nr_res);
-}
-
-int CNIOLinux_io_uring_enable_rings(struct io_uring *ring)
-{
-    return 0;
-//    return liburing_functions.io_uring_enable_rings(ring);
-}
-
 inline int CNIOLinux___io_uring_sqring_wait(struct io_uring *ring)
 {
     return liburing_functions.__io_uring_sqring_wait(ring);
 }
 
-    // mark the CQE as done
-    // This function is declared as static inline in the liburing
-    // headers so we need to manually stub it in CNILinux.h and
-    // ensure that we call the one defined in the liburing header here
-    // this function is inlined down to calls to atomic_store_explicit etc
-    // so it doesn't reference symbols from liburing and we should be ok.
-inline void CNIOLinux_io_uring_cqe_seen(struct io_uring *ring, struct io_uring_cqe *cqe)
-{
-    io_uring_cqe_seen(ring, cqe);
-    return;
-}
-// duplication of inline code here
-
-
-
+// Inlined functions that reference dynamically loaded functions
+// basically copied from liburing.h with minimal adjustments.
 
 /*
  * Return an IO completion, waiting for 'wait_nr' completions if one isn't

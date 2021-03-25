@@ -81,7 +81,10 @@ int CNIOLinux___io_uring_get_cqe(struct io_uring *ring,
                   struct io_uring_cqe **cqe_ptr, unsigned submit,
                   unsigned wait_nr, sigset_t *sigmask);
 
-// The rest are inlined functions which are not dynamically resolved
+// The rest are inlined functions which reference some of the symbols
+// we are dynamically loading, most inlines in liburing just manipulate
+// struct members which are fine to call directly, but these we
+// don't want to pull in directly.
 int CNIOLinux_io_uring_wait_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr);
 unsigned CNIOLinux_io_uring_sq_ready(const struct io_uring *ring);
 void CNIOLinux_io_uring_sqe_set_linked(struct io_uring_sqe *sqe);

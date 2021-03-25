@@ -149,13 +149,13 @@ static inline int io_uring_peek_cqe(struct io_uring *ring,
 static inline int io_uring_wait_cqe(struct io_uring *ring,
                                     struct io_uring_cqe **cqe_ptr) { return 0; }
 int __io_uring_get_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr, unsigned submit,
-                                 unsigned wait_nr, sigset_t *sigmask) { return 0};
+                       unsigned wait_nr, sigset_t *sigmask) { return 0; }
 
 // stubs for inlined functions
 static inline extern struct io_uring_sqe *CNIOLinux_io_uring_get_sqe(struct io_uring *ring) { return NULL; }
 static inline void CNIOLinux_io_uring_submit(struct io_uring *ring) { return; }
 static inline int CNIOLinux_io_uring_wait_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr) {return 0;}
-static unsigned CNIOLinux_io_uring_sq_ready(const struct io_uring *ring) { return 0; }
+static inline unsigned io_uring_sq_ready(const struct io_uring *ring) { return 0; }
 static void CNIOLinux_io_uring_sqe_set_linked(struct io_uring_sqe *sqe) { return; }
 
 #endif /* C_NIO_LIBURING_UNAVAILABLE */
