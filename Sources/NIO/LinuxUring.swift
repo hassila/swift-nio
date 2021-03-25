@@ -35,7 +35,7 @@ internal enum UringError: Error {
 }
 
 internal extension TimeAmount {
-    public func kernelTimespec() -> __kernel_timespec {
+    func kernelTimespec() -> __kernel_timespec {
         var ts = __kernel_timespec()
         ts.tv_sec = self.nanoseconds / 1_000_000_000
         ts.tv_nsec = self.nanoseconds % 1_000_000_000
