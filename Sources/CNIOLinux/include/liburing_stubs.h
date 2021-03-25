@@ -31,7 +31,7 @@ struct io_uring {};
 struct io_uring_params {};
 struct io_uring_cqe {};
 struct io_uring_probe {};
-struct io_uring_sqe {};
+struct io_uring_sqe { int flags; };
 struct io_uring_restriction {};
 struct statx {}; // FIXME: should include proper header instead, man page include doesnt work as expected, need investigation
 struct open_how {}; // FIXME: should include proper header instead, but doesnt seem to exist on older distros
@@ -153,9 +153,9 @@ int __io_uring_get_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr, uns
 
 // stubs for inlined functions
 static inline struct io_uring_sqe *CNIOLinux_io_uring_get_sqe(struct io_uring *ring) { return NULL; }
-static inline int CNIOLinux_io_uring_submit(struct io_uring *ring) { return 0; }
-static inline int CNIOLinux_io_uring_wait_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr) {return 0;}
-static void CNIOLinux_io_uring_sqe_set_linked(struct io_uring_sqe *sqe) { return; }
+// static inline int CNIOLinux_io_uring_submit(struct io_uring *ring) { return 0; }
+// static inline int CNIOLinux_io_uring_wait_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr) {return 0;}
+// static void CNIOLinux_io_uring_sqe_set_linked(struct io_uring_sqe *sqe) { return; }
 
 #endif /* C_NIO_LIBURING_UNAVAILABLE */
 
