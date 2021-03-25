@@ -26,7 +26,6 @@
 #warning "liburing not available, using epoll"
 #include <stdbool.h>  // bool
 #include <linux/time_types.h> // struct __kernel_timespec
-#include "io_uring.h" // we pull in a local copy for the sqe/cqe structs and flags
 
 // these are pulled in from liburing.h to allow us to manipulate flags etc
 // directly, but we cant take the header as it defines extern c functions.
