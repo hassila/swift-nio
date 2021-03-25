@@ -37,8 +37,6 @@
 #include <liburing.h>
 #else
 #define C_NIO_LIBURING_UNAVAILABLE // liburing will be disabled (falling back on epoll)
-#include "io_uring.h" // we pull in a local copy for the sqe/cqe structs and flags
-#include "barrier.h" // we pull in a local copy for the sqe/cqe structs and flags
 #endif
 
 // Some explanation is required here.
@@ -91,5 +89,7 @@ size_t CNIOLinux_CMSG_SPACE(size_t);
 
 #include "liburing_stubs.h" // including this  to quiet compiler warning about empty includes
 #include "liburing_nio.h"
+#include "io_uring.h" // we pull in a local copy for the sqe/cqe structs and flags
+#include "barrier.h" // we pull in a local copy for the sqe/cqe structs and flags
 
 #endif

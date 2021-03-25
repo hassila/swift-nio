@@ -2,6 +2,8 @@
 // (liburing will be disabled then though)
 #ifdef __linux__
 
+#ifdef C_NIO_LIBURING_UNAVAILABLE // this is to quiet compiler warnings for umbrella headers
+
 /* SPDX-License-Identifier: (GPL-2.0 WITH Linux-syscall-note) OR MIT */
 /*
  * Header file for the io_uring interface.
@@ -382,6 +384,8 @@ struct io_uring_getevents_arg {
 
 #ifdef __cplusplus
 }
+#endif
+
 #endif
 
 #endif

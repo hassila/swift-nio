@@ -1,4 +1,11 @@
 /* SPDX-License-Identifier: MIT */
+
+// from liburing project, local copy needed for builds on linux platforms without liburing installed
+// (liburing will be disabled then though)
+#ifdef __linux__
+
+#ifdef C_NIO_LIBURING_UNAVAILABLE // this is to quiet compiler warnings for umbrella headers
+
 #ifndef LIBURING_BARRIER_H
 #define LIBURING_BARRIER_H
 
@@ -71,3 +78,8 @@ static inline T io_uring_smp_load_acquire(const T *p)
 #endif
 
 #endif /* defined(LIBURING_BARRIER_H) */
+
+#endif
+
+#endif
+
