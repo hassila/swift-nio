@@ -362,11 +362,11 @@ public class Uring {
             if (result > 0) {
                 assert(bitPattern > 0, "Bitpattern should never be zero")
 
-                _debugPrint("io_uring_wait_cqe eventType[\(eventType)] fd[\(fd)] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                _debugPrint("io_uring_wait_cqe fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
 
                 events.append((fd, UInt32(cqes[0]!.pointee.res)))
             } else {
-                _debugPrint("io_uring_wait_cqe non-positive result eventType[\(eventType)] fd[\(fd)] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                _debugPrint("io_uring_wait_cqe non-positive result fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
             }
             CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
         }
@@ -402,11 +402,11 @@ public class Uring {
                 let result = cqes[0]!.pointee.res
 
                 if (result > 0) {
-                    _debugPrint("io_uring_wait_cqe_timeout eventType[\(eventType)] fd[\(fd)] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                    _debugPrint("io_uring_wait_cqe_timeout fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
 
                     events.append((fd, UInt32(cqes[0]!.pointee.res)))
                 } else {
-                    _debugPrint("io_uring_wait_cqe_timeout non-positive result eventType[\(eventType)] fd[\(fd)] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                    _debugPrint("io_uring_wait_cqe_timeout non-positive result fd[\(fd)] eventType[\(String(describing:eventType))]  bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
                 }
                 
                 CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
