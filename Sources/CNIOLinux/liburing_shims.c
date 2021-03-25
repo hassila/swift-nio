@@ -158,7 +158,7 @@ int _check_compatible_kernel_version() {
     if ((ver[0] > 5) || ((ver[0] == 5) && (ver[1] >= 12))) {
         return 0;
     }
-
+    
     fprintf(stderr, "Trying to run with liburing on unsupported kernel version %ld.%ld\n", ver[0], ver[1]);
     return -1;
 }
