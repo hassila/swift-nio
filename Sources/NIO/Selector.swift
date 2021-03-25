@@ -60,21 +60,21 @@ struct SelectorEventSet: OptionSet, Equatable {
     /// of flags or to compare against spurious wakeups.
     static let _none = SelectorEventSet([])
 
-    /// Connection reset or other errors. 1
+    /// Connection reset or other errors.
     static let reset = SelectorEventSet(rawValue: 1 << 0)
 
-    /// EOF at the read/input end of a `Selectable`.2
+    /// EOF at the read/input end of a `Selectable`.
     static let readEOF = SelectorEventSet(rawValue: 1 << 1)
 
-    /// Interest in/availability of data to be read 4
+    /// Interest in/availability of data to be read
     static let read = SelectorEventSet(rawValue: 1 << 2)
 
-    /// Interest in/availability of data to be written 8
+    /// Interest in/availability of data to be written
     static let write = SelectorEventSet(rawValue: 1 << 3)
 
     /// EOF at the write/output end of a `Selectable`.
     ///
-    /// - note: This is rarely used because in many cases, there is no signal that this happened. 16
+    /// - note: This is rarely used because in many cases, there is no signal that this happened.
     static let writeEOF = SelectorEventSet(rawValue: 1 << 4)
 
     init(rawValue: SelectorEventSet.RawValue) {
@@ -405,7 +405,7 @@ internal class Selector<R: Registration> {
         self.myThread = NIOThread.current
         events = Selector.allocateEventsArray(capacity: eventsCapacity)
         self.lifecycleState = .closed
-        if (sharedInitializationOnly) // for URing, we break out here, should refactor to kqueue/epoll/uring separate subclasses probably
+        if (sharedInitializationOnly) // FIXME: // for URing, we break out here, should refactor to kqueue/epoll/uring separate subclasses probably
         {
             return
         }
@@ -768,7 +768,7 @@ internal class Selector<R: Registration> {
                 
             #endif
             
-            if (self.selectorFD > 0) { // uring one is already closed in subclass
+            if (self.selectorFD > 0) { // uring one is already closed in subclass by liburing teardown
                 try! Posix.close(descriptor: self.selectorFD)
                 self.selectorFD = -1
             }
@@ -797,15 +797,14 @@ internal class Selector<R: Registration> {
                 guard self.eventFD >= 0 else {
                     throw EventLoopError.shutdown
                 }
-            _ = try EventFd.eventfd_write(fd: self.eventFD, value: 1)
-            _debugPrint("eventfd_write done for eventfd_write [\(self.eventFD)]")
-           #endif
+                _ = try EventFd.eventfd_write(fd: self.eventFD, value: 1)
+            #endif
         }
     }
 }
 
 
-internal class URingSelector<R: Registration>: Selector<R> { // FIXME: should, but can't be final due to SAL tests...
+final internal class URingSelector<R: Registration>: Selector<R> {
 #if os(Linux)
     private typealias EventType = Uring
 
