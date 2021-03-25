@@ -1007,7 +1007,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
                     assert(!self.lifecycleManager.isPreRegistered)
                     break loop
                 case .normal(.none):
-                    // FIXME: We fail on this condition with uring on some tests
+                    // FIXME: We fail on this condition with uring on some tests, needs discussion
                     preconditionFailure("got .readEOF and read returned not reading any bytes, nor EOF.")
                 case .normal(.some):
                     // normal, note that there is no guarantee we're still active (as the user might have closed in callout)
@@ -1061,7 +1061,6 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
     private final func readable0() -> ReadStreamState {
         self.eventLoop.assertInEventLoop()
         assert(self.lifecycleManager.isActive)
-//        _debugPrint("readable0 1 \(self)")
 
         defer {
             if self.isOpen && !self.readPending {
@@ -1072,7 +1071,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
         let readResult: ReadResult
         do {
             readResult = try self.readFromSocket()
-//            _debugPrint("readable0 2 readResult[\(readResult)]")
+//            _debugPrint("readable0 self.readFromSocket() readResult[\(readResult)]")
         } catch let err {
             let readStreamState: ReadStreamState
             // ChannelError.eof is not something we want to fire through the pipeline as it just means the remote
@@ -1092,7 +1091,6 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
                         self.close0(error: err, mode: .input, promise: nil)
                     }
                     self.readPending = false
-//                    _debugPrint("readable0 3")
                     return .eof
                 }
             } else {
@@ -1102,27 +1100,15 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
 
             // Call before triggering the close of the Channel.
             if readStreamState != .error, self.lifecycleManager.isActive {
-//                _debugPrint("readable0 4")
                 self.pipeline.fireChannelReadComplete0()
             }
 
             if self.shouldCloseOnReadError(err) {
-//                _debugPrint("readable0 5")
                 self.close0(error: err, mode: .all, promise: nil)
             }
 
             return readStreamState
         }
-//        _debugPrint("readResult [\(readResult)]")
-        // FIXME: This block should be removed when uring_io is fixed #310
-/*        if (readResult == .none)
-        {
-            _debugPrint("FORCE CLOSE")
-//            self.pipeline.fireChannelReadComplete0()
-            self.readPending = false
-            self.close0(error: ChannelError.eof, mode: .all, promise: nil)
-            return .eof
-        }*/
 //        assert(readResult == .some)
 // FIXME: We hit this assert with uring as we can receive multiple
         // socket accept readiness notifications, if we then fail to

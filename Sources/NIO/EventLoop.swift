@@ -794,7 +794,6 @@ extension EventLoopGroup {
     }
 
     public func syncShutdownGracefully() throws {
-//        print("syncShutdownGracefully syncShutdownGracefully ")
         if let eventLoop = MultiThreadedEventLoopGroup.currentEventLoop {
             preconditionFailure("""
             BUG DETECTED: syncShutdownGracefully() must not be called when on an EventLoop.
@@ -805,21 +804,15 @@ extension EventLoopGroup {
         let errorStorageLock = Lock()
         var errorStorage: Error? = nil
         let continuation = DispatchWorkItem {}
-//        print("syncShutdownGracefully syncShutdownGracefully 2")
         self.shutdownGracefully { error in
-//            print("syncShutdownGracefully error \(error)")
             if let error = error {
                 errorStorageLock.withLock {
-//                    print("syncShutdownGracefully \(error) errorStorageLock \(errorStorageLock)")
                     errorStorage = error
                 }
             }
-//           print("[\(NIOThread.current)] perform() sssyncShutdownGracefully \(continuation)")
             continuation.perform()
         }
-//        print("[\(NIOThread.current)] waiting for \(continuation)")
         continuation.wait()
-//        print("syncShutdownGracefully syncShutdownGracefully 4 \(continuation)")
         try errorStorageLock.withLock {
             if let error = errorStorage {
                 throw error
@@ -875,7 +868,10 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
     private let shutdownLock: Lock = Lock()
     private var runState: RunState = .running
 
-    // FIXME: This is not thread safe, needs some other mechanism for guaranteeing single use
+    // internal selectorFactor to choose variant of
+    // Selector to use. Try to use liburing on linux
+    // otherwise fall back on normal Selector (epoll).
+    // FIXME: This is not thread safe, needs some other mechanism for guaranteeing single io_uring_load
     private static var initializedUring = false
     private static func selectorFactory() throws -> NIO.Selector<NIORegistration>
     {
@@ -889,6 +885,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
             return try NIO.URingSelector<NIORegistration>.init()
         } catch  {
 //            print("Failed URingSelector")
+            // fall through and return usual Selector
         }
         #endif
         return try NIO.Selector<NIORegistration>.init()

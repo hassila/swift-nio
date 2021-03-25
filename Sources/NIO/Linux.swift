@@ -40,7 +40,6 @@ internal enum TimerFd {
 internal enum EventFd {
     public static let EFD_CLOEXEC = CNIOLinux.EFD_CLOEXEC
     public static let EFD_NONBLOCK = CNIOLinux.EFD_NONBLOCK
-    public static let EFD_SEMAPHORE = CNIOLinux.EFD_SEMAPHORE
     public typealias eventfd_t = CNIOLinux.eventfd_t
 
     @inline(never)
@@ -120,7 +119,7 @@ enum UringError: Error {
     case uringWaitCqeFailure
     case uringWaitCqeTimeoutFailure
 }
-
+/*
 extension StringProtocol {
     var drop0xPrefix: SubSequence { hasPrefix("0x") ? dropFirst(2) : self[...] }
     var drop0bPrefix: SubSequence { hasPrefix("0b") ? dropFirst(2) : self[...] }
@@ -135,7 +134,7 @@ extension BinaryInteger {
     var binary: String { .init(self, radix: 2) }
     var hexa: String { .init(self, radix: 16) }
 }
-
+*/
 extension TimeAmount {
     public func kernelTimespec() -> __kernel_timespec {
         var ts = __kernel_timespec()
