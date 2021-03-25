@@ -26,8 +26,9 @@
 #warning "liburing not available, using epoll"
 #include <stdbool.h>  // bool
 #include <linux/time_types.h> // struct __kernel_timespec
-
+#include "local_io_uring.h" // we pull in a local copy for all the structs and flags
 struct io_uring {};
+/*
 struct io_uring_params {};
 struct io_uring_cqe {};
 struct io_uring_probe {};
@@ -35,7 +36,7 @@ struct io_uring_sqe {};
 struct io_uring_restriction {};
 struct statx {}; // FIXME: should include proper header instead, man page include doesnt work as expected, need investigation
 struct open_how {}; // FIXME: should include proper header instead, but doesnt seem to exist on older distros
-
+*/
 static inline int io_uring_opcode_supported(const struct io_uring_probe *p, int op) { return 0; }
 static inline void io_uring_cq_advance(struct io_uring *ring, unsigned nr) { return; }
 static inline void io_uring_cqe_seen(struct io_uring *ring, struct io_uring_cqe *cqe) { return; }
