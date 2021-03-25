@@ -346,7 +346,7 @@ internal class Selector<R: Registration> {
     fileprivate var earliestTimer: NIODeadline = .distantFuture
     #endif
 
-    fileprivate var eventsCapacity = 64
+    private var eventsCapacity = 64
     fileprivate var events: UnsafeMutablePointer<EventType>
     fileprivate var registrations = [Int: R]()
     // temporary workaround to stop us delivering outdated events; read in `whenReady`, set in `deregister`
@@ -405,7 +405,7 @@ internal class Selector<R: Registration> {
         self.myThread = NIOThread.current
         events = Selector.allocateEventsArray(capacity: eventsCapacity)
         self.lifecycleState = .closed
-        if (sharedInitializationOnly) // FIXME: // for URing, we break out here, should refactor to kqueue/epoll/uring separate subclasses probably
+        if (sharedInitializationOnly) // for URing, we break out here, should refactor to kqueue/epoll/uring separate subclasses probably
         {
             return
         }
@@ -768,7 +768,7 @@ internal class Selector<R: Registration> {
                 
             #endif
             
-            if (self.selectorFD > 0) { // uring one is already closed in subclass by liburing teardown
+            if (self.selectorFD > 0) { // uring one is already closed in subclass
                 try! Posix.close(descriptor: self.selectorFD)
                 self.selectorFD = -1
             }
@@ -797,14 +797,15 @@ internal class Selector<R: Registration> {
                 guard self.eventFD >= 0 else {
                     throw EventLoopError.shutdown
                 }
-                _ = try EventFd.eventfd_write(fd: self.eventFD, value: 1)
-            #endif
+            _ = try EventFd.eventfd_write(fd: self.eventFD, value: 1)
+            _debugPrint("eventfd_write done for eventfd_write [\(self.eventFD)]")
+           #endif
         }
     }
 }
 
 
-final internal class URingSelector<R: Registration>: Selector<R> {
+internal class URingSelector<R: Registration>: Selector<R> { // FIXME: should, but can't be final due to SAL tests...
 #if os(Linux)
     private typealias EventType = Uring
 
@@ -821,7 +822,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
 
         ring.io_uring_prep_poll_add(fd: self.eventFD, poll_mask: Uring.POLLIN) // wakeups
         self.lifecycleState = .open
-        _debugPrint("UringSelector up and running \(self.selectorFD)")
+        _debugPrint("UringSelector %d up and running \(self.selectorFD)")
     }
 
     deinit {
@@ -843,7 +844,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         try selectable.withUnsafeHandle { fd in
             assert(registrations[Int(fd)] == nil)
             
-            _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
+          _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
          ring.io_uring_prep_poll_add(fd: fd, poll_mask: interested.uringEventSet)
 
             registrations[Int(fd)] = makeRegistration(interested)
@@ -940,7 +941,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
 
        if (ready > 0)
         {
-        _debugPrint("fds: \(fds) ")
+            _debugPrint("fds: \(fds) ")
         }
         // start with no deregistrations happened
         self.deregistrationsHappened = false
@@ -957,14 +958,13 @@ override func deregister<S: Selectable>(selectable: S) throws {
             // If the registration is not in the Map anymore we deregistered it during the processing of whenReady(...). In this case just skipit.
             switch fd {
             case self.eventFD:
-                _debugPrint("wakeup successful fd [\(fd)] [\(NIOThread.current)]")
+               _debugPrint("wakeup successful fd [\(fd)] [\(NIOThread.current)]")
                     var val = EventFd.eventfd_t()
                     do {
                         _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
                         // some explanation is in order. we need to specifically reregister
                         // the polling of the eventfd descriptor
-                    }
-                    catch { // errorReturn
+                    } catch let errorReturn {
      // FIXME: Add assertion that only EAGAIN is expected here.
 //                        assert(errorReturn == EAGAIN, "eventfd_read return unexpected errno \(errorReturn)")
                     }
@@ -979,12 +979,12 @@ override func deregister<S: Selectable>(selectable: S) throws {
     //            assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
 
                 // in any case we only want what the user is currently registered for & what we got
-                    _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
+                _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
                 selectorEvent = selectorEvent.intersection(registration.interested)
-                    _debugPrint("intersection [\(selectorEvent)]")
+                _debugPrint("intersection [\(selectorEvent)]")
 
                     if selectorEvent.contains(.readEOF) {
-                        _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
+                       _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
 
                     }
 
@@ -1000,13 +1000,13 @@ override func deregister<S: Selectable>(selectable: S) throws {
                     try body((SelectorEvent(io: selectorEvent, registration: registration)))
                     
                } else { // remove any polling if we don't have a registration for it
-                _debugPrint("We had no registration for fd [\(fd)] poll_mask [\(poll_mask)] - removing it")
+                    _debugPrint("We had no registration for fd [\(fd)] poll_mask [\(poll_mask)] - removing it")
                     ring.io_uring_prep_poll_remove(fd: fd, poll_mask: poll_mask)
                 }
             }
         }
         if (self.deregistrationsHappened) {
-            _debugPrint("deregistrationsHappened")
+          _debugPrint("deregistrationsHappened")
         }
         ring.io_uring_flush() // flush reregisteration of the polls if needed (nop in SQPOLL mode)
         growEventArrayIfNeeded(ready: ready)
