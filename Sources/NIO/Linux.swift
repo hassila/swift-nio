@@ -320,10 +320,9 @@ public class Uring {
 
         let userbitPattern : Int = CqeEventType.pollModify.rawValue << 32 + Int(fd)
 
-        let oldBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(oldBitpattern))
         let userBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: UInt(userbitPattern))
 
-        // _debugPrint("io_uring_poll_update fd[\(fd)] oldPollmask[\(oldPollmask)] newPollmask[\(newPollmask)] oldBitpatternAsPointer[\(String(describing:oldBitpatternAsPointer))] userBitpatternAsPointer[\(String(describing:userBitpatternAsPointer))]")
+        // _debugPrint("io_uring_poll_update fd[\(fd)] oldPollmask[\(oldPollmask)] newPollmask[\(newPollmask)]  userBitpatternAsPointer[\(String(describing:userBitpatternAsPointer))]")
 
         CNIOLinux.io_uring_prep_poll_add(sqe, fd, 0)
         sqe!.pointee.len |= IORING_POLL_ADD_MULTI       // ask for multiple updates
@@ -448,7 +447,7 @@ public class Uring {
 //            dumpCqes("io_uring_wait_cqe")
             let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[0]))
             let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
-            let poll_mask = UInt32(bitPattern >> 32) // shift out the fd
+//            let poll_mask = UInt32(bitPattern >> 32) // shift out the fd
             let result = cqes[0]!.pointee.res
 
             if (result > 0) {
@@ -490,7 +489,7 @@ public class Uring {
 //                dumpCqes("io_uring_wait_cqe_timeout")
                 let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[0]))
                 let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
-                let poll_mask = UInt32(bitPattern >> 32) // shift out the fd
+//                let poll_mask = UInt32(bitPattern >> 32) // shift out the fd
                 let result = cqes[0]!.pointee.res
                 if (result > 0) {
                     // _debugPrint("io_uring_wait_cqe_timeout poll_mask[\(poll_mask)] fd[\(fd)] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")

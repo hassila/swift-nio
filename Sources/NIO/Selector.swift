@@ -964,10 +964,11 @@ override func deregister<S: Selectable>(selectable: S) throws {
                         _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
                         // some explanation is in order. we need to specifically reregister
                         // the polling of the eventfd descriptor
-                    } catch let errorReturn {
+                    }
+//                    catch let errorReturn {
      // FIXME: Add assertion that only EAGAIN is expected here.
 //                        assert(errorReturn == EAGAIN, "eventfd_read return unexpected errno \(errorReturn)")
-                    }
+//                    }
             default:
                 if let registration = registrations[Int(fd)] {
                     // _debugPrint("We found a registration for fd [\(fd)]") // \(registration)
