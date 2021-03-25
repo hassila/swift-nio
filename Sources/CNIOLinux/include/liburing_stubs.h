@@ -194,8 +194,8 @@ static inline int io_uring_peek_cqe(struct io_uring *ring,
                                     struct io_uring_cqe **cqe_ptr) { return 0; }
 static inline int io_uring_wait_cqe(struct io_uring *ring,
                                     struct io_uring_cqe **cqe_ptr) { return 0; }
-int __io_uring_get_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr, unsigned submit,
-                       unsigned wait_nr, sigset_t *sigmask) { return 0; }
+//int __io_uring_get_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr, unsigned submit,
+//                       unsigned wait_nr, sigset_t *sigmask) { return 0; }
 
 #endif /* C_NIO_LIBURING_UNAVAILABLE */
 
