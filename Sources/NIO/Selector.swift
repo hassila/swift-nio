@@ -950,7 +950,7 @@ override func deregister<S: Selectable>(selectable: S) throws {
           //  if self.deregistrationsHappened && fd != self.eventFD {
            //         break
           //  }
-            _debugPrint("for f in fds \(f.0) \(f.1), self.deregistrationsHappened [\(self.deregistrationsHappened)]")
+//            _debugPrint("for f in fds \(f.0) \(f.1), self.deregistrationsHappened [\(self.deregistrationsHappened)]")
             // If the registration is not in the Map anymore we deregistered it during the processing of whenReady(...). In this case just skipit.
             switch event.fd {
             case self.eventFD:
