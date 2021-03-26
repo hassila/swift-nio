@@ -884,11 +884,15 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
             }
             return try NIO.URingSelector<NIORegistration>.init()
         } catch  {
-//            print("Failed URingSelector")
             // fall through and return usual Selector
         }
         #endif
-        return try NIO.Selector<NIORegistration>.init()
+        
+        #if os(Linux) || os(Android)
+        return try NIO.EpollSelector<NIORegistration>.init()
+        #endif
+
+        return try NIO.KqueueSelector<NIORegistration>.init()
     }
     
     private static func runTheLoop(thread: NIOThread,
@@ -967,7 +971,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
     /// - arguments:
     ///     - threadInitializers: The `ThreadInitializer`s to use.
     internal init(threadInitializers: [ThreadInitializer],
-                  selectorFactory: @escaping () throws -> NIO.Selector<NIORegistration> = { try .init() }) {
+                  selectorFactory: @escaping () throws -> NIO.Selector<NIORegistration> = MultiThreadedEventLoopGroup.selectorFactory) {
         let myGroupID = nextEventLoopGroupID.add(1)
         self.myGroupID = myGroupID
         var idx = 0
