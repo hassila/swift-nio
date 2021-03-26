@@ -275,8 +275,7 @@ public class Uring {
     @inline(never)
     public func io_uring_peek_batch_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) -> Int {
         _debugPrint("io_uring_peek_batch_cqe")
-        let currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, min(maxevents, cqeMaxCount))
-// FIXME read cqeMaxCount and break loop below early if we got enough to fill maxevents
+        let currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, cqeMaxCount)
         if currentCqeCount == 0 {
             return 0
         }
@@ -331,7 +330,12 @@ public class Uring {
                 default:
                     assertionFailure("Unknown type")
             }
-            
+            if (fdEvents.count == maxevents)
+            {
+                _debugPrint("io_uring_peek_batch_cqe breaking loop early, currentCqeCount [\(currentCqeCount)] maxevents [\(maxevents)]")
+                currentCqeCount = maxevents // to make sure we only cq_advance the correct amount
+                break
+            }
         }
 
         io_uring_cq_advance(&ring, currentCqeCount) // bulk variant of io_uring_cqe_seen(&ring, dataPointer)
