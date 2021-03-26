@@ -910,6 +910,11 @@ final internal class URingSelector<R: Registration>: Selector<R> {
     #if os(Linux)
     private typealias EventType = UringEvent
 
+    // The rules for `self.selectorFD`, `self.eventFD`, and `self.timerFD`:
+    // reads: `self.externalSelectorFDLock` OR access from the EventLoop thread
+    // writes: `self.externalSelectorFDLock` AND access from the EventLoop thread
+    private var eventFD: CInt = -1 // -1 == we're closed
+
     private var events: UnsafeMutablePointer<EventType>
     private var eventsCapacity = 64
 
