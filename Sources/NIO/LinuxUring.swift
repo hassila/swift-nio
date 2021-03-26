@@ -89,7 +89,9 @@ public class Uring {
             _debugPrint("\(i) = fd[\(fd)] eventType[\(String(describing:CqeEventType(rawValue:eventType)))] res [\(c.res)] flags [\(c.flags)]  bitpattern[\(String(describing:bitpatternAsPointer))]")
         }
     }
-    
+    // FIXME: This is not thread safe, needs some other mechanism for guaranteeing single io_uring_load
+    private static var initializedUring = false
+
     init() {
         cqes = UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>.allocate(capacity: Int(cqeMaxCount))
         cqes.initialize(repeating:&emptyCqe, count:Int(cqeMaxCount))
@@ -101,11 +103,17 @@ public class Uring {
     
    @inline(never)
     public static func io_uring_load() throws -> () {
-            if (CNIOLinux.CNIOLinux_io_uring_load() != 0)
-            {
-                throw UringError.loadFailure // this will force epoll() to be used instead
-            }
+        if initializedUring == true
+        {
+            return;
         }
+
+        if (CNIOLinux.CNIOLinux_io_uring_load() != 0)
+        {
+            throw UringError.loadFailure // this will force epoll() to be used instead
+        }
+        initializedUring = true
+    }
 
     public func fd() -> Int32 {
        return ring.ring_fd
