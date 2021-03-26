@@ -150,7 +150,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
         }, vectorBufferWriteOperation: { ptrs in
             // Gathering write
             _debugPrint("writeToSocket writev ptrs[\(ptrs)]")
-            return try self.socket.writev(iovecs: ptrs)
+            try self.socket.writev(iovecs: ptrs)
         }, scalarFileWriteOperation: { descriptor, index, endIndex in
             try self.socket.sendFile(fd: descriptor, offset: index, count: endIndex - index)
         })
