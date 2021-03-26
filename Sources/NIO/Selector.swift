@@ -337,7 +337,7 @@ extension UringFilterSet {
 
 /* this is deliberately not thread-safe, only the wakeup() function may be called unprotectedly */
 internal class Selector<R: Registration> {
-    fileprivate var lifecycleState: SelectorLifecycleState = .initializing
+    fileprivate var lifecycleState: SelectorLifecycleState = .initializing // internal to give SAL access
 
     fileprivate var registrations = [Int: R]()
     // temporary workaround to stop us delivering outdated events; read in `whenReady`, set in `deregister`
@@ -364,7 +364,11 @@ internal class Selector<R: Registration> {
         self.myThread = NIOThread.current
         self.lifecycleState = .closed
     }
-
+    
+    func _SAL_init () { // needed for SAL, don't want to open access for lifecycleState.
+        self.lifecycleState = .open
+    }
+    
     deinit {
         assert(self.registrations.count == 0, "left-over registrations: \(self.registrations)")
         assert(self.lifecycleState == .closed, "Selector \(self.lifecycleState) (expected .closed) on deinit")
