@@ -865,7 +865,7 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
                 }
             }
         }
-        growEventArrayIfNeeded<EventType>(ready: ready)
+        growEventArrayIfNeeded(ready: ready)
     }
 
     /// Close the `Selector`.
@@ -935,7 +935,6 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         eventsCapacity = ready << 1 // double capacity
         events = Self.allocateEventsArray(capacity: eventsCapacity)
     }
-
 
     override init() throws {
         try super.init()
