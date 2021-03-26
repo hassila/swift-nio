@@ -359,15 +359,16 @@ internal class Selector<R: Registration> {
             return try body(self.selectorFD)
         }
     }
-        
+    
+    internal func _testsOnly_init () { // needed for SAL, don't want to open access for lifecycleState, normal subclasses of Selector sets this in init after calling super.init() and finishing initializing.
+        self.lifecycleState = .open
+    }
+
     init() throws {
         self.myThread = NIOThread.current
         self.lifecycleState = .closed
     }
     
-    func _SAL_init () { // needed for SAL, don't want to open access for lifecycleState.
-        self.lifecycleState = .open
-    }
     
     deinit {
         assert(self.registrations.count == 0, "left-over registrations: \(self.registrations)")

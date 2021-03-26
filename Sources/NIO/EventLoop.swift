@@ -866,25 +866,25 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
     private let eventLoops: [SelectableEventLoop]
     private let shutdownLock: Lock = Lock()
     private var runState: RunState = .running
-
+    
     // internal selectorFactory to choose variant of
     // Selector to use. Try to use liburing on linux
     // otherwise fall back on normal Selector (epoll).
-    private static func defaultSelectorFactory() throws -> NIO.Selector<NIORegistration> {
+    static func defaultSelectorFactory<R>() throws -> NIO.Selector<R> {
         #if os(Linux)
         do {
-            return try NIO.URingSelector<NIORegistration>.init()
+            return try NIO.URingSelector<R>.init()
         } catch  {
             // fall through and return usual Selector
         }
         #endif
         
         #if os(Linux) || os(Android)
-        return try NIO.EpollSelector<NIORegistration>.init()
+        return try NIO.EpollSelector<R>.init()
         #endif
         
         #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(FreeBSD)
-        return try NIO.KqueueSelector<NIORegistration>.init()
+        return try NIO.KqueueSelector<R>.init()
         #endif
     }
     
