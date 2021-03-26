@@ -874,6 +874,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
     // FIXME: This is not thread safe, needs some other mechanism for guaranteeing single io_uring_load
     private static var initializedUring = false
     private static func selectorFactory() throws -> NIO.Selector<NIORegistration> {
+        #if os(Linux) || os(Android)
         #if os(Linux)
         do {
             if initializedUring == false
@@ -887,11 +888,10 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
         }
         #endif
         
-        #if os(Linux) || os(Android)
         return try NIO.EpollSelector<NIORegistration>.init()
         #endif
 
-        try NIO.KqueueSelector<NIORegistration>.init()
+        return try NIO.KqueueSelector<NIORegistration>.init()
     }
     
     private static func runTheLoop(thread: NIOThread,
