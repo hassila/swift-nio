@@ -15,7 +15,7 @@
 // This is a companion to System.swift that provides only Linux specials: either things that exist
 // only on Linux, or things that have Linux-specific extensions.
 
-#if os(Linux) || os(Android)
+#if os(Linux)
 
 import CNIOLinux
 
@@ -64,6 +64,9 @@ public class Uring {
     var fdEvents = [Int32: UInt32]() // fd : event_poll_return
     var emptyCqe = io_uring_cqe()
 
+    // FIXME: This is not thread safe, needs some other mechanism for guaranteeing single io_uring_load
+    private static var initializedUring = false
+
     func dumpCqes(_ header:String, count: Int = 1)
     {
         if count < 0 {
@@ -89,8 +92,6 @@ public class Uring {
             _debugPrint("\(i) = fd[\(fd)] eventType[\(String(describing:CqeEventType(rawValue:eventType)))] res [\(c.res)] flags [\(c.flags)]  bitpattern[\(String(describing:bitpatternAsPointer))]")
         }
     }
-    // FIXME: This is not thread safe, needs some other mechanism for guaranteeing single io_uring_load
-    private static var initializedUring = false
 
     init() {
         cqes = UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>.allocate(capacity: Int(cqeMaxCount))
@@ -247,12 +248,13 @@ public class Uring {
         // Documentation here:
         // https://git.kernel.dk/cgit/linux-block/commit/?h=poll-multiple&id=33021a19e324fb747c2038416753e63fd7cd9266
         CNIOLinux.io_uring_prep_poll_add(sqe, fd, 0)
+        CNIOLinux.io_uring_sqe_set_data(sqe, userBitpatternAsPointer)
+
         sqe!.pointee.len |= IORING_POLL_ADD_MULTI       // ask for multiple updates
         sqe!.pointee.len |= IORING_POLL_UPDATE_EVENTS   // update existing mask
         sqe!.pointee.len |= IORING_POLL_UPDATE_USER_DATA // and update user data
         sqe!.pointee.addr = UInt64(oldBitpattern) // old user_data
         sqe!.pointee.off = UInt64(newBitpattern) // new user_data
-        CNIOLinux.io_uring_sqe_set_data(sqe, userBitpatternAsPointer)
         sqe!.pointee.poll_events = UInt16(newPollmask) // new poll mask
 
         if submitNow {
@@ -283,7 +285,8 @@ public class Uring {
         dumpCqes("io_uring_peek_batch_cqe", count: Int(currentCqeCount))
 
         assert(currentCqeCount >= 0, "currentCqeCount should never be negative")
-        
+        assert(maxevents > 0, "maxevents should be a positive number")
+
         for i in 0 ..< currentCqeCount
         {
             let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[Int(i)]))
@@ -295,6 +298,7 @@ public class Uring {
                 case .poll:
                     switch result {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
+                            assert(fd >= 0, "fd must be greater than zero")
                             let pollError = (Uring.POLLHUP | Uring.POLLERR)
                             if let current = fdEvents[fd] {
                                 fdEvents[fd] = current | pollError
@@ -315,6 +319,7 @@ public class Uring {
                             break
                         default: // positive success
                             assert(bitPattern > 0, "Bitpattern should never be zero")
+                            assert(fd >= 0, "fd must be greater than zero")
 
                             let uresult = UInt32(result)
                             if let current = fdEvents[fd] {
@@ -340,20 +345,21 @@ public class Uring {
 
         io_uring_cq_advance(&ring, currentCqeCount) // bulk variant of io_uring_cqe_seen(&ring, dataPointer)
 
-        //  return single event per fd
+        //  return single event per fd,
         var count = 0
         for (fd, result_mask) in fdEvents {
             assert(count < maxevents)
+            assert(fd >= 0)
+
             events[count].fd = fd
             events[count].pollMask = result_mask
             count+=1
-/*
+
             let socketClosing = (result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
 
             if (socketClosing == true) {
                 _debugPrint("socket is going down [\(fd)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
             }
- */
         }
 
         if count > 0 {

@@ -41,7 +41,6 @@ extension NIOBSDSocket {
     }
 
     static func close(socket s: NIOBSDSocket.Handle) throws {
-//        _debugPrint("Shutdown socket \(s)")
         return try Posix.close(descriptor: s)
     }
 

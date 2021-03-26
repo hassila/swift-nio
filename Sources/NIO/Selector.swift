@@ -15,7 +15,6 @@
 import NIOConcurrencyHelpers
 
 private enum SelectorLifecycleState {
-    case initializing
     case open
     case closing
     case closed
@@ -333,11 +332,11 @@ extension UringFilterSet {
 ///  A `Selector` allows a user to register different `Selectable` sources to an underlying OS selector, and for that selector to notify them once IO is ready for them to process.
 ///
 /// This implementation offers an consistent API over epoll/liburing (for linux) and kqueue (for Darwin, BSD).
-/// There are specific subclasses  per API type with a shared common superclass providin overall scaffolding.
+/// There are specific subclasses  per API type with a shared common superclass providing overall scaffolding.
 
 /* this is deliberately not thread-safe, only the wakeup() function may be called unprotectedly */
 internal class Selector<R: Registration> {
-    fileprivate var lifecycleState: SelectorLifecycleState = .initializing // internal to give SAL access
+    fileprivate var lifecycleState: SelectorLifecycleState
 
     fileprivate var registrations = [Int: R]()
     // temporary workaround to stop us delivering outdated events; read in `whenReady`, set in `deregister`
@@ -359,7 +358,7 @@ internal class Selector<R: Registration> {
             return try body(self.selectorFD)
         }
     }
-    
+
     internal func _testsOnly_init () { // needed for SAL, don't want to open access for lifecycleState, normal subclasses of Selector sets this in init after calling super.init() and finishing initializing.
         self.lifecycleState = .open
     }
@@ -368,7 +367,6 @@ internal class Selector<R: Registration> {
         self.myThread = NIOThread.current
         self.lifecycleState = .closed
     }
-    
     
     deinit {
         assert(self.registrations.count == 0, "left-over registrations: \(self.registrations)")
@@ -596,6 +594,7 @@ final internal class KqueueSelector<R: Registration>: Selector<R> {
                                                                  kqueueApplyEventChangeSet)
         }
     }
+    
     override func _register<S: Selectable>(selectable: S, fd: Int, interested: SelectorEventSet) throws {
         try kqueueUpdateEventNotifications(selectable: selectable, interested: interested, oldInterested: nil)
     }
@@ -946,6 +945,18 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         events = Self.allocateEventsArray(capacity: eventsCapacity)
     }
 
+    private func getEnvironmentVar(_ name: String) -> String? {
+        guard let rawValue = getenv(name) else { return nil }
+        return String(validatingUTF8: rawValue)
+    }
+
+    public func _debugPrint(_ s : @autoclosure () -> String)
+    {
+        if getEnvironmentVar("NIO_SELECTOR") != nil {
+            print("S [\(NIOThread.current)] " + s())
+        }
+    }
+    
     override init() throws {
         try Uring.io_uring_load()
 
@@ -969,7 +980,6 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         assert(self.eventFD == -1, "self.eventFD == \(self.eventFD) on URingSelector deinit, forgot close?")
     }
 
-
     override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet) throws {
         _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
         
@@ -987,17 +997,6 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         ring.io_uring_prep_poll_remove(fd: Int32(fd), poll_mask: oldInterested.uringEventSet)
     }
 
-    private func getEnvironmentVar(_ name: String) -> String? {
-        guard let rawValue = getenv(name) else { return nil }
-        return String(validatingUTF8: rawValue)
-    }
-
-    public func _debugPrint(_ s : @autoclosure () -> String)
-    {
-        if getEnvironmentVar("NIO_SELECTOR") != nil {
-            print("S [\(NIOThread.current)] " + s())
-        }
-    }
     /// Apply the given `SelectorStrategy` and execute `body` once it's complete (which may produce `SelectorEvent`s to handle).
     ///
     /// - parameters:
@@ -1031,11 +1030,22 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         // start with no deregistrations happened
         self.deregistrationsHappened = false
 
-        // temporary workaround to stop us delivering outdated events; possibly set in `deregister`
-        for i in 0..<ready where !self.deregistrationsHappened {
+        for i in 0..<ready {
             let event = events[i]
                         
             // If the registration is not in the Map anymore we deregistered it during the processing of whenReady(...). In this case just skipit.
+            // temporary workaround to stop us delivering outdated events; possibly set in `deregister`
+            if (self.deregistrationsHappened && event.fd != self.eventFD) // allow processing of eventFD wakeups with normal loop
+            {
+                // FIXME: This is only needed due to the edge triggered nature of liburing, possibly
+                // we can get away with only updating (force triggering an event if available) for
+                // partial reads (where we currently give up after 4 iterations)
+                if let registration = registrations[Int(event.fd)] {
+                    ring.io_uring_poll_update(fd: event.fd, newPollmask: registration.interested.uringEventSet, oldPollmask:registration.interested.uringEventSet, submitNow:false)
+                }
+                continue
+            }
+            
             switch event.fd {
             case self.eventFD:
                _debugPrint("wakeup successful event.fd [\(event.fd)] [\(NIOThread.current)]")
@@ -1043,20 +1053,20 @@ final internal class URingSelector<R: Registration>: Selector<R> {
                     do {
                         _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
                     } catch  { // let errorReturn
-     // FIXME: Add assertion that only EAGAIN is expected here.
-//                        assert(errorReturn == EAGAIN, "eventfd_read return unexpected errno \(errorReturn)")
+                        // FIXME: Add assertion that only EAGAIN is expected here.
+                        // assert(errorReturn == EAGAIN, "eventfd_read return unexpected errno \(errorReturn)")
                     }
             default:
                 if let registration = registrations[Int(event.fd)] {
                     _debugPrint("We found a registration for event.fd [\(event.fd)]") // \(registration)
 
                     var selectorEvent = SelectorEventSet(uringEvent: event.pollMask)
-//                    let socketClosing = (event.pollMask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
+                    // let socketClosing = (event.pollMask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
 
                     // we can only verify the events for i == 0 as for i > 0 the user might have changed the registrations since then.
                     // we can't assert this for uring, as we possibly can get an old pollmask update as the
                     // modifications of registrations are async. the intersection() below handles that case too.
-//                    assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
+                    // assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
 
                     // in any case we only want what the user is currently registered for & what we got
                     _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
