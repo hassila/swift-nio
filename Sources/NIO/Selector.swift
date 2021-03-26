@@ -747,9 +747,9 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
     }
     
     override init() throws {
-        try super.init()
-
         events = Self.allocateEventsArray(capacity: eventsCapacity)
+
+        try super.init()
 
         self.selectorFD = try Epoll.epoll_create(size: 128)
         self.eventFD = try EventFd.eventfd(initval: 0, flags: Int32(EventFd.EFD_CLOEXEC | EventFd.EFD_NONBLOCK))
@@ -942,9 +942,9 @@ final internal class URingSelector<R: Registration>: Selector<R> {
     }
 
     override init() throws {
-        try super.init()
-
         events = Self.allocateEventsArray(capacity: eventsCapacity)
+
+        try super.init()
 
         try ring.io_uring_queue_init()
         self.selectorFD = ring.fd()
@@ -1045,7 +1045,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
                         _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
                         // some explanation is in order. we need to specifically reregister
                         // the polling of the eventfd descriptor
-                    } catch let errorReturn {
+                    } catch  { // let errorReturn
      // FIXME: Add assertion that only EAGAIN is expected here.
 //                        assert(errorReturn == EAGAIN, "eventfd_read return unexpected errno \(errorReturn)")
                     }
