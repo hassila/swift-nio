@@ -1107,6 +1107,9 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         try super.close()
         ring.io_uring_queue_exit() // FIXME: Double-check fd is closed here
         self.selectorFD = -1 // closed by uring_queue_exit
+
+        try! Posix.close(descriptor: self.eventFD)
+        self.eventFD = -1
         return
     }
 
