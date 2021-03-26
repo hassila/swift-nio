@@ -776,7 +776,7 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
         assert(self.timerFD == -1, "self.timerFD == \(self.timerFD) on EpollSelector deinit, forgot close?")
     }
 
-    override private func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet) throws {
+    override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet) throws {
         var ev = Epoll.epoll_event()
         ev.events = interested.epollEventSet
         ev.data.fd = fd
@@ -784,7 +784,7 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
         try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_ADD, fd: fd, event: &ev)
     }
 
-    override private func _reregister<S: Selectable>(selectable : S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet) throws {
+    override func _reregister<S: Selectable>(selectable : S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet) throws {
         var ev = Epoll.epoll_event()
         ev.events = newInterested.epollEventSet
         ev.data.fd = fd
@@ -792,7 +792,7 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
         _ = try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_MOD, fd: fd, event: &ev)
     }
 
-    override private func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet) throws {
+    override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet) throws {
         var ev = Epoll.epoll_event()
         _ = try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_DEL, fd: fd, event: &ev)
     }
@@ -959,19 +959,19 @@ final internal class URingSelector<R: Registration>: Selector<R> {
     }
 
 
-    override private func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet) throws {
+    override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet) throws {
         _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
         
         ring.io_uring_prep_poll_add(fd: fd, poll_mask: interested.uringEventSet)
     }
 
-    override private func _reregister<S: Selectable>(selectable : S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet) throws {
+    override func _reregister<S: Selectable>(selectable : S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet) throws {
         _debugPrint("Re-register old \(oldInterested) new \(newInterested) uringEventSet [\(oldInterested.uringEventSet)] reg.uringEventSet [\(newInterested.uringEventSet)]")
 
         ring.io_uring_poll_update(fd: fd, newPollmask: newInterested.uringEventSet, oldPollmask:oldInterested.uringEventSet)
     }
 
-    override private func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet) throws {
+    override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet) throws {
         _debugPrint("deregister interested \(selectable) reg.interested.uringEventSet [\(oldInterested.uringEventSet)]")
         ring.io_uring_prep_poll_remove(fd: fd, poll_mask: oldInterested.uringEventSet)
     }
