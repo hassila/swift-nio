@@ -356,7 +356,7 @@ public class Uring {
     }
 
     @inline(never)
-    public func io_uring_wait_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: Int32) throws -> Int {
+    public func io_uring_wait_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) throws -> Int {
         _debugPrint("io_uring_wait_cqe")
         let error = CNIOLinux_io_uring_wait_cqe(&ring, cqes)
         var count = 0
@@ -398,7 +398,7 @@ public class Uring {
     }
 
     @inline(never)
-    public func io_uring_wait_cqe_timeout(events: UnsafeMutablePointer<UringEvent>, maxevents: Int32, timeout: TimeAmount) throws -> Int {
+    public func io_uring_wait_cqe_timeout(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32, timeout: TimeAmount) throws -> Int {
         var ts = timeout.kernelTimespec()
         var count = 0
 
