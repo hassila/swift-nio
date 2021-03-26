@@ -941,7 +941,19 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         events = Self.allocateEventsArray(capacity: eventsCapacity)
     }
 
+    // FIXME: This is not thread safe, needs some other mechanism for guaranteeing single io_uring_load
+    private static var initializedUring = false
+
+    private static func loadUring() throws {
+        if initializedUring == false
+        {
+            try Uring.io_uring_load()
+            initializedUring = true
+        }
+    }
     override init() throws {
+        try Self.loadUring()
+        
         events = Self.allocateEventsArray(capacity: eventsCapacity)
 
         try super.init()

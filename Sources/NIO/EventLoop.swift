@@ -14,7 +14,6 @@
 
 import NIOConcurrencyHelpers
 import Dispatch
-import CNIOLinux
 
 /// Returned once a task was scheduled on the `EventLoop` for later execution.
 ///
@@ -868,19 +867,12 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
     private let shutdownLock: Lock = Lock()
     private var runState: RunState = .running
 
-    // internal selectorFactor to choose variant of
+    // internal selectorFactory to choose variant of
     // Selector to use. Try to use liburing on linux
     // otherwise fall back on normal Selector (epoll).
-    // FIXME: This is not thread safe, needs some other mechanism for guaranteeing single io_uring_load
-    private static var initializedUring = false
     private static func selectorFactory() throws -> NIO.Selector<NIORegistration> {
         #if os(Linux)
         do {
-            if initializedUring == false
-            {
-                try Uring.io_uring_load()
-                initializedUring = true
-            }
             return try NIO.URingSelector<NIORegistration>.init()
         } catch  {
             // fall through and return usual Selector
