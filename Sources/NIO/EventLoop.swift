@@ -867,15 +867,15 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
     private let shutdownLock: Lock = Lock()
     private var runState: RunState = .running
     
-    // internal selectorFactory to choose variant of
-    // Selector to use. Try to use liburing on linux
-    // otherwise fall back on normal Selector (epoll).
+    // internal selectorFactory to choose variant of Selector to use.
+    // Try to use liburing on Linux by default, otherwise fall back on epoll.
     static func defaultSelectorFactory<R>() throws -> NIO.Selector<R> {
         #if os(Linux)
         do {
             return try NIO.URingSelector<R>.init()
         } catch  {
-            // fall through and return usual Selector
+            // fall through and return default Selector on failure
+            // this is typically either lack of liburing or too old kernel
         }
         #endif
         
