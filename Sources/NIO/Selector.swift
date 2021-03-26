@@ -922,7 +922,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
     
     private static func allocateEventsArray(capacity: Int) -> UnsafeMutablePointer<EventType> {
         let events: UnsafeMutablePointer<EventType> = UnsafeMutablePointer.allocate(capacity: capacity)
-        events.initialize(to: EventType())
+        events.initialize(to: EventType(fd:0, pollMask: 0))
         return events
     }
 
