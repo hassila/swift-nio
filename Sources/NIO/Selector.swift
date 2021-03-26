@@ -992,12 +992,12 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         return String(validatingUTF8: rawValue)
     }
 
-    func _debugPrint(_ s:String) {
+    public func _debugPrint(_ s : @autoclosure () -> String)
+    {
         if getEnvironmentVar("NIO_SELECTOR") != nil {
-            print("S [\(NIOThread.current)] " + s)
+            print("S [\(NIOThread.current)] " + s())
         }
     }
-
     /// Apply the given `SelectorStrategy` and execute `body` once it's complete (which may produce `SelectorEvent`s to handle).
     ///
     /// - parameters:

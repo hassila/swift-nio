@@ -265,13 +265,13 @@ public class Uring {
         return String(validatingUTF8: rawValue)
     }
 
-    internal func _debugPrint(_ s:String)
+    public func _debugPrint(_ s : @autoclosure () -> String)
     {
         if getEnvironmentVar("NIO_LINUX") != nil {
-            print("L [\(NIOThread.current)] " + s)
+            print("L [\(NIOThread.current)] " + s())
         }
     }
-    
+
     @inline(never)
     public func io_uring_peek_batch_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) -> Int {
         _debugPrint("io_uring_peek_batch_cqe")

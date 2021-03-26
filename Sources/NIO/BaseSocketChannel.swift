@@ -197,10 +197,10 @@ func getEnvironmentVar(_ name: String) -> String? {
     return String(validatingUTF8: rawValue)
 }
 
-public func _debugPrint(_ s:String)
+public func _debugPrint(_ s : @autoclosure () -> String)
 {
     if getEnvironmentVar("NIO_BSC") != nil {
-        print("B [\(NIOThread.current)] " + s)
+        print("B [\(NIOThread.current)] " + s())
     }
 }
 
