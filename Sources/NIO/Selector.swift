@@ -747,7 +747,7 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
     }
     
     override init() throws {
-        super.init()
+        try super.init()
 
         events = Self.allocateEventsArray(capacity: eventsCapacity)
 
@@ -779,22 +779,22 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
     override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet) throws {
         var ev = Epoll.epoll_event()
         ev.events = interested.epollEventSet
-        ev.data.fd = fd
+        ev.data.fd = Int32(fd)
 
-        try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_ADD, fd: fd, event: &ev)
+        try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_ADD, fd: ev.data.fd, event: &ev)
     }
 
     override func _reregister<S: Selectable>(selectable : S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet) throws {
         var ev = Epoll.epoll_event()
         ev.events = newInterested.epollEventSet
-        ev.data.fd = fd
+        ev.data.fd = Int32(fd)
 
-        _ = try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_MOD, fd: fd, event: &ev)
+        _ = try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_MOD, fd: ev.data.fd, event: &ev)
     }
 
     override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet) throws {
         var ev = Epoll.epoll_event()
-        _ = try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_DEL, fd: fd, event: &ev)
+        _ = try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_DEL, fd: Int32(fd), event: &ev)
     }
     
     /// Apply the given `SelectorStrategy` and execute `body` once it's complete (which may produce `SelectorEvent`s to handle).
