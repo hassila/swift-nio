@@ -749,7 +749,7 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
     override init() throws {
         super.init()
 
-        events = Self.allocateEventsArray<EventType>(capacity: eventsCapacity)
+        events = Self.allocateEventsArray(capacity: eventsCapacity)
 
         self.selectorFD = try Epoll.epoll_create(size: 128)
         self.eventFD = try EventFd.eventfd(initval: 0, flags: Int32(EventFd.EFD_CLOEXEC | EventFd.EFD_NONBLOCK))
@@ -770,7 +770,7 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
     }
 
     deinit {
-        Self.deallocateEventsArray<EventType>(events: events, capacity: eventsCapacity)
+        Self.deallocateEventsArray(events: events, capacity: eventsCapacity)
 
         assert(self.eventFD == -1, "self.eventFD == \(self.eventFD) on EpollSelector deinit, forgot close?")
         assert(self.timerFD == -1, "self.timerFD == \(self.timerFD) on EpollSelector deinit, forgot close?")
@@ -940,7 +940,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
     override init() throws {
         try super.init()
 
-        events = Self.allocateEventsArray<EventType>(capacity: eventsCapacity)
+        events = Self.allocateEventsArray(capacity: eventsCapacity)
 
         try ring.io_uring_queue_init()
         self.selectorFD = ring.fd()
@@ -953,7 +953,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
     }
 
     deinit {
-        Self.deallocateEventsArray<EventType>(events: events, capacity: eventsCapacity)
+        Self.deallocateEventsArray(events: events, capacity: eventsCapacity)
 
         assert(self.eventFD == -1, "self.eventFD == \(self.eventFD) on URingSelector deinit, forgot close?")
     }
