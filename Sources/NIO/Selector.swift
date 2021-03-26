@@ -960,7 +960,7 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         ring.io_uring_prep_poll_add(fd: Int32(self.eventFD), poll_mask: Uring.POLLIN) // wakeups
 
         self.lifecycleState = .open
-        _debugPrint("UringSelector %d up and running \(self.selectorFD)")
+        _debugPrint("UringSelector up and running fd [\(self.selectorFD)]")
     }
 
     deinit {
@@ -1022,16 +1022,12 @@ final internal class URingSelector<R: Registration>: Selector<R> {
             _debugPrint("whenReady.block")
             ready = Int(ring.io_uring_peek_batch_cqe(events: events, maxevents: UInt32(eventsCapacity))) // first try to consume any existing
 
-            if (ready <= 0)   // otherwise block (only single supported, but we will empty cqe next run around...
+            if (ready <= 0)   // otherwise block (only single supported, but we will use batch peek cqe next run around...
             {
                 ready = try ring.io_uring_wait_cqe(events: events, maxevents: UInt32(eventsCapacity))
             }
         }
 
-       if (ready > 0)
-        {
-            _debugPrint("events: \(events) ")
-        }
         // start with no deregistrations happened
         self.deregistrationsHappened = false
 
@@ -1039,10 +1035,6 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         for i in 0..<ready where !self.deregistrationsHappened {
             let event = events[i]
                         
-          //  if self.deregistrationsHappened && fd != self.eventFD {
-           //         break
-          //  }
-//            _debugPrint("for f in fds \(f.0) \(f.1), self.deregistrationsHappened [\(self.deregistrationsHappened)]")
             // If the registration is not in the Map anymore we deregistered it during the processing of whenReady(...). In this case just skipit.
             switch event.fd {
             case self.eventFD:
@@ -1050,8 +1042,6 @@ final internal class URingSelector<R: Registration>: Selector<R> {
                     var val = EventFd.eventfd_t()
                     do {
                         _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
-                        // some explanation is in order. we need to specifically reregister
-                        // the polling of the eventfd descriptor
                     } catch  { // let errorReturn
      // FIXME: Add assertion that only EAGAIN is expected here.
 //                        assert(errorReturn == EAGAIN, "eventfd_read return unexpected errno \(errorReturn)")
@@ -1063,13 +1053,13 @@ final internal class URingSelector<R: Registration>: Selector<R> {
                     var selectorEvent = SelectorEventSet(uringEvent: event.pollMask)
 //                    let socketClosing = (event.pollMask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
 
-                // we can only verify the events for i == 0 as for i > 0 the user might have changed the registrations since then.
-    //            assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
+                    // we can only verify the events for i == 0 as for i > 0 the user might have changed the registrations since then.
+                    assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
 
-                // in any case we only want what the user is currently registered for & what we got
-                _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
-                selectorEvent = selectorEvent.intersection(registration.interested)
-                _debugPrint("intersection [\(selectorEvent)]")
+                    // in any case we only want what the user is currently registered for & what we got
+                    _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
+                    selectorEvent = selectorEvent.intersection(registration.interested)
+                    _debugPrint("intersection [\(selectorEvent)]")
 
                     if selectorEvent.contains(.readEOF) {
                        _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
@@ -1083,6 +1073,9 @@ final internal class URingSelector<R: Registration>: Selector<R> {
 
                     _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask))")
 
+                    // FIXME: This is only needed due to the edge triggered nature of liburing, possibly
+                    // we can get away with only updating (force triggering an event if available) for
+                    // partial reads (where we currently give up after 4 iterations)
                     ring.io_uring_poll_update(fd: event.fd, newPollmask: registration.interested.uringEventSet, oldPollmask:registration.interested.uringEventSet, submitNow:false)
 
                     try body((SelectorEvent(io: selectorEvent, registration: registration)))

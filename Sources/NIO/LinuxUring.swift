@@ -276,7 +276,7 @@ public class Uring {
     public func io_uring_peek_batch_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) -> Int {
         _debugPrint("io_uring_peek_batch_cqe")
         let currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, min(maxevents, cqeMaxCount))
-
+// FIXME read cqeMaxCount and break loop below early if we got enough to fill maxevents
         if currentCqeCount == 0 {
             return 0
         }
