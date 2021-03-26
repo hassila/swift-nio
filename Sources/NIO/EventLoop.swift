@@ -870,7 +870,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
     // internal selectorFactory to choose variant of
     // Selector to use. Try to use liburing on linux
     // otherwise fall back on normal Selector (epoll).
-    private static func selectorFactory() throws -> NIO.Selector<NIORegistration> {
+    private static func defaultSelectorFactory() throws -> NIO.Selector<NIORegistration> {
         #if os(Linux)
         do {
             return try NIO.URingSelector<NIORegistration>.init()
@@ -883,7 +883,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
         return try NIO.EpollSelector<NIORegistration>.init()
         #endif
         
-        #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS)
+        #if os(iOS) || os(macOS) || os(tvOS) || os(watchOS) || os(FreeBSD)
         return try NIO.KqueueSelector<NIORegistration>.init()
         #endif
     }
@@ -949,7 +949,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
     /// - arguments:
     ///     - numberOfThreads: The number of `Threads` to use.
     public convenience init(numberOfThreads: Int) {
-        self.init(numberOfThreads: numberOfThreads, selectorFactory: MultiThreadedEventLoopGroup.selectorFactory)
+        self.init(numberOfThreads: numberOfThreads, selectorFactory: MultiThreadedEventLoopGroup.defaultSelectorFactory)
     }
 
     internal convenience init(numberOfThreads: Int,
@@ -964,7 +964,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
     /// - arguments:
     ///     - threadInitializers: The `ThreadInitializer`s to use.
     internal init(threadInitializers: [ThreadInitializer],
-                  selectorFactory: @escaping () throws -> NIO.Selector<NIORegistration> = MultiThreadedEventLoopGroup.selectorFactory) {
+                  selectorFactory: @escaping () throws -> NIO.Selector<NIORegistration> = MultiThreadedEventLoopGroup.defaultSelectorFactory) {
         let myGroupID = nextEventLoopGroupID.add(1)
         self.myGroupID = myGroupID
         var idx = 0
@@ -1107,7 +1107,7 @@ public final class MultiThreadedEventLoopGroup: EventLoopGroup {
         let callingThread = NIOThread.current
         MultiThreadedEventLoopGroup.runTheLoop(thread: callingThread,
                                                canEventLoopBeShutdownIndividually: true,
-                                               selectorFactory: MultiThreadedEventLoopGroup.selectorFactory,
+                                               selectorFactory: MultiThreadedEventLoopGroup.defaultSelectorFactory,
                                                initializer: { _ in }) { loop in
             loop.assertInEventLoop()
             callback(loop)
