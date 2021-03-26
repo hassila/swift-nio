@@ -1054,7 +1054,9 @@ final internal class URingSelector<R: Registration>: Selector<R> {
 //                    let socketClosing = (event.pollMask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
 
                     // we can only verify the events for i == 0 as for i > 0 the user might have changed the registrations since then.
-                    assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
+                    // we can't assert this for uring, as we possibly can get an old pollmask update as the
+                    // modifications of registrations are async. the intersection() below handles that case too.
+//                    assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
 
                     // in any case we only want what the user is currently registered for & what we got
                     _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
