@@ -18,7 +18,7 @@ Repository | NIO 2 (Swift 5+) | NIO 1 (Swift 4+)
 [https://github.com/apple/swift-nio-http2][repo-nio-http2]<br> HTTP/2 support | `from: "1.0.0"` | `from: "0.1.0"`
 [https://github.com/apple/swift-nio-extras][repo-nio-extras] <br>useful additions around SwiftNIO | `from: "1.0.0"` | `from: "0.1.0"`
 [https://github.com/apple/swift-nio-transport-services][repo-nio-transport-services] <br> first-class support for macOS, iOS, tvOS, and watchOS | `from: "1.0.0"` | `from: "0.1.0"`
-[https://github.com/apple/swift-nio-ssh][repo-nio-ssh] <br> SSH support | `.upToNextMinor(from: "0.1.0")` | _n/a_
+[https://github.com/apple/swift-nio-ssh][repo-nio-ssh] <br> SSH support | `.upToNextMinor(from: "0.2.0")` | _n/a_
 
 ### Protocol Implementations
 
@@ -34,6 +34,8 @@ HTTP/1 | ✅| ✅ | [apple/swift-nio](https://github.com/apple/swift-nio) | [`NI
 HTTP/2 | ✅| ✅ | [apple/swift-nio-http2](https://github.com/apple/swift-nio-http2) | [`NIOHTTP2`](https://apple.github.io/swift-nio-http2/docs/current/NIOHTTP2/index.html) | official NIO project
 WebSocket | ✅| ✅ | [apple/swift-nio](https://github.com/apple/swift-nio) | [`NIOWebSocket`](https://apple.github.io/swift-nio/docs/current/NIOWebSocket/index.html) | official NIO project
 TLS | ✅ | ✅ | [apple/swift-nio-ssl](https://github.com/apple/swift-nio-ssl) | [`NIOSSL`](https://apple.github.io/swift-nio-ssl/docs/current/NIOSSL/index.html) | official NIO project
+SSH | ✅ | ✅ | [apple/swift-nio-ssh][repo-nio-ssh] | _n/a_ | official NIO project
+
 
 #### High-level implementations
 
