@@ -1031,7 +1031,6 @@ final internal class URingSelector<R: Registration>: Selector<R> {
         // temporary workaround to stop us delivering outdated events; possibly set in `deregister`
         for i in 0..<ready where !self.deregistrationsHappened {
             let event = events[i]
-            let poll_mask = events[i].event.pollMask
                         
           //  if self.deregistrationsHappened && fd != self.eventFD {
            //         break
