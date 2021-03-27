@@ -99,7 +99,6 @@ func run(identifier: String) {
         }
         try! serverHandler.completionFuture.wait()
         return numberOfIterations
-//        return 0
     }
 }
 

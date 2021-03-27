@@ -172,7 +172,7 @@ int CNIOLinux_io_uring_load()
     void *dl_handle;
     const char *err;
     
-    // first a number of sanity checks, did we compile with actual liburing headers?
+    // first a number of checks, did we compile with actual liburing headers?
 #ifdef C_NIO_LIBURING_UNAVAILABLE
     return -1;
 #endif
