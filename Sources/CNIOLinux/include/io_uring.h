@@ -3,7 +3,7 @@
 #ifdef __linux__
 
 #ifdef C_NIO_LIBURING_UNAVAILABLE // only pull in these definitions if liburing isn't actually available
-typedef __u32 __kernel_rwf_t;
+typedef int __kernel_rwf_t;
 
 /* SPDX-License-Identifier: (GPL-2.0 WITH Linux-syscall-note) OR MIT */
 /*
