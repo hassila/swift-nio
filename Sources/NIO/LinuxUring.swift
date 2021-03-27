@@ -49,11 +49,11 @@ internal struct UringEvent {
 }
 
 internal class Uring {
-    public static let POLLIN: CUnsignedInt = numericCast(CNIOLinux.POLLIN)
-    public static let POLLOUT: CUnsignedInt = numericCast(CNIOLinux.POLLOUT)
-    public static let POLLERR: CUnsignedInt = numericCast(CNIOLinux.POLLERR)
-    public static let POLLRDHUP: CUnsignedInt = numericCast(CNIOLinux.EPOLLRDHUP.rawValue) // FIXME: - POLLRDHUP not in ubuntu headers?!
-    public static let POLLHUP: CUnsignedInt = numericCast(CNIOLinux.POLLHUP)
+    internal static let POLLIN: CUnsignedInt = numericCast(CNIOLinux.POLLIN)
+    internal static let POLLOUT: CUnsignedInt = numericCast(CNIOLinux.POLLOUT)
+    internal static let POLLERR: CUnsignedInt = numericCast(CNIOLinux.POLLERR)
+    internal static let POLLRDHUP: CUnsignedInt = numericCast(CNIOLinux.EPOLLRDHUP.rawValue) // FIXME: - POLLRDHUP not in ubuntu headers?!
+    internal static let POLLHUP: CUnsignedInt = numericCast(CNIOLinux.POLLHUP)
 
     private var ring = io_uring()
     // FIXME: These should be tunable somewhere, somehow. Maybe environment vars are ok, need to discuss with SwiftNIO team.
@@ -103,12 +103,11 @@ internal class Uring {
         cqes.deallocate()
     }
 
-    public func fd() -> Int32 {
+    internal func fd() -> Int32 {
        return ring.ring_fd
     }
 
-    @inline(never)
-    public func io_uring_queue_init() throws -> () {
+    internal func io_uring_queue_init() throws -> () {
         // FIXME: IORING_SETUP_SQPOLL is currently basically useless in default configuraiton as it starts one kernel
         // poller thread per ring. It is possible to regulate this by sharing a kernel thread for the polling
         // with IORING_SETUP_ATTACH_WQ, but it requires the first ring to be setup with polling and then the
@@ -128,8 +127,7 @@ internal class Uring {
         _debugPrint("io_uring_queue_init \(self.ring.ring_fd)")
      }
   
-    @inline(never)
-    public func io_uring_queue_exit() {
+    internal func io_uring_queue_exit() {
         _debugPrint("io_uring_queue_exit \(self.ring.ring_fd)")
         CNIOLinux_io_uring_queue_exit(&ring)
     }
@@ -153,8 +151,7 @@ internal class Uring {
     //   cache behavior. Should be revisited, probably a more reasonable size of the ring
     //   would be in the hundreds rather than thousands.
     
-    @inline(never)
-    public func io_uring_flush() {         // When using SQPOLL this is just a NOP
+    internal func io_uring_flush() {         // When using SQPOLL this is just a NOP
         var submissions = 0
         var retval : Int32
         
@@ -186,8 +183,7 @@ internal class Uring {
         _debugPrint("io_uring_flush done")
     }
 
-    @inline(never)
-    public func io_uring_prep_poll_add(fd: Int32, pollMask: UInt32, submitNow: Bool = true) -> () {
+    internal func io_uring_prep_poll_add(fd: Int32, pollMask: UInt32, submitNow: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
         let bitPattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd)
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
@@ -204,8 +200,7 @@ internal class Uring {
         }
     }
     
-    @inline(never)
-    public func io_uring_prep_poll_remove(fd: Int32, pollMask: UInt32, submitNow: Bool = true) -> () {
+    internal func io_uring_prep_poll_remove(fd: Int32, pollMask: UInt32, submitNow: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
         let bitPattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd) // must be same as the poll for liburing to match
         let userbitPattern : Int = CqeEventType.pollDelete.rawValue << 32 + Int(fd)
@@ -222,8 +217,7 @@ internal class Uring {
         }
     }
 
-    @inline(never)
-    public func io_uring_poll_update(fd: Int32, newPollmask: UInt32, oldPollmask: UInt32, submitNow: Bool = true) -> () {
+    internal func io_uring_poll_update(fd: Int32, newPollmask: UInt32, oldPollmask: UInt32, submitNow: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
         let oldBitpattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd)
         let newBitpattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd)
@@ -254,15 +248,14 @@ internal class Uring {
         return String(cString: rawValue)
     }
 
-    public func _debugPrint(_ s : @autoclosure () -> String)
+    internal func _debugPrint(_ s : @autoclosure () -> String)
     {
         if getEnvironmentVar("NIO_LINUX") != nil {
             print("L [\(NIOThread.current)] " + s())
         }
     }
 
-    @inline(never)
-    public func io_uring_peek_batch_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) -> Int {
+    internal func io_uring_peek_batch_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) -> Int {
         _debugPrint("io_uring_peek_batch_cqe")
         var currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, cqeMaxCount)
         if currentCqeCount == 0 {
@@ -360,8 +353,7 @@ internal class Uring {
         return count
     }
 
-    @inline(never)
-    public func io_uring_wait_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) throws -> Int {
+    internal func io_uring_wait_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) throws -> Int {
         _debugPrint("io_uring_wait_cqe")
         let error = CNIOLinux_io_uring_wait_cqe(&ring, cqes)
         var count = 0
@@ -402,8 +394,7 @@ internal class Uring {
         return count
     }
 
-    @inline(never)
-    public func io_uring_wait_cqe_timeout(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32, timeout: TimeAmount) throws -> Int {
+    internal func io_uring_wait_cqe_timeout(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32, timeout: TimeAmount) throws -> Int {
         var ts = timeout.kernelTimespec()
         var count = 0
 

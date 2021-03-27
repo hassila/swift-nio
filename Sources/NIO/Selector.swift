@@ -950,7 +950,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
         events = Self.allocateEventsArray(capacity: eventsCapacity)
     }
 
-    public func _debugPrint(_ s : @autoclosure () -> String)
+    internal func _debugPrint(_ s : @autoclosure () -> String)
     {
         if getEnvironmentVar("NIO_SELECTOR") != nil {
             print("S [\(NIOThread.current)] " + s())
