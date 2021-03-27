@@ -275,7 +275,7 @@ internal class Uring {
             let result = cqes[Int(i)]!.pointee.res
 
             switch eventType {
-                case .poll:
+                case .poll?:
                     switch result {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
@@ -308,9 +308,9 @@ internal class Uring {
                                 fdEvents[fd] = uresult
                             }
                     }
-                case .pollModify:
+                case .pollModify?:
                     break
-                case .pollDelete:
+                case .pollDelete?:
                     break
                 default:
                     assertionFailure("Unknown type")
