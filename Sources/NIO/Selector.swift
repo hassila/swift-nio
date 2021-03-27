@@ -499,13 +499,13 @@ final internal class KqueueSelector<R: Registration>: Selector<R> {
         guard ready == eventsCapacity else {
             return
         }
-        Self.deallocateEventsArray(events: events, capacity: eventsCapacity)
+        KqueueSelector.deallocateEventsArray(events: events, capacity: eventsCapacity)
         eventsCapacity = ready << 1 // double capacity
-        events = Self.allocateEventsArray(capacity: eventsCapacity)
+        events = KqueueSelector.allocateEventsArray(capacity: eventsCapacity)
     }
     
     override init() throws {
-        events = Self.allocateEventsArray(capacity: eventsCapacity)
+        events = KqueueSelector.allocateEventsArray(capacity: eventsCapacity)
 
         try super.init()
         
@@ -525,7 +525,7 @@ final internal class KqueueSelector<R: Registration>: Selector<R> {
     }
 
     deinit {
-        Self.deallocateEventsArray(events: events, capacity: eventsCapacity)
+        KqueueSelector.deallocateEventsArray(events: events, capacity: eventsCapacity)
     }
 
     private static func toKQueueTimeSpec(strategy: SelectorStrategy) -> timespec? {
@@ -619,7 +619,7 @@ final internal class KqueueSelector<R: Registration>: Selector<R> {
         }
 
 
-        let timespec = Self.toKQueueTimeSpec(strategy: strategy)
+        let timespec = KqueueSelector.toKQueueTimeSpec(strategy: strategy)
         let ready = try timespec.withUnsafeOptionalPointer { ts in
             Int(try KQueue.kevent(kq: self.selectorFD, changelist: nil, nchanges: 0, eventlist: events, nevents: Int32(eventsCapacity), timeout: ts))
         }
@@ -745,13 +745,13 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
         guard ready == eventsCapacity else {
             return
         }
-        Self.deallocateEventsArray(events: events, capacity: eventsCapacity)
+        EpollSelector.deallocateEventsArray(events: events, capacity: eventsCapacity)
         eventsCapacity = ready << 1 // double capacity
-        events = Self.allocateEventsArray(capacity: eventsCapacity)
+        events = EpollSelector.allocateEventsArray(capacity: eventsCapacity)
     }
     
     override init() throws {
-        events = Self.allocateEventsArray(capacity: eventsCapacity)
+        events = EpollSelector.allocateEventsArray(capacity: eventsCapacity)
 
         try super.init()
 
@@ -774,7 +774,7 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
     }
 
     deinit {
-        Self.deallocateEventsArray(events: events, capacity: eventsCapacity)
+        EpollSelector.deallocateEventsArray(events: events, capacity: eventsCapacity)
 
         assert(self.eventFD == -1, "self.eventFD == \(self.eventFD) on EpollSelector deinit, forgot close?")
         assert(self.timerFD == -1, "self.timerFD == \(self.timerFD) on EpollSelector deinit, forgot close?")
@@ -945,9 +945,9 @@ final internal class UringSelector<R: Registration>: Selector<R> {
         guard ready == eventsCapacity else {
             return
         }
-        Self.deallocateEventsArray(events: events, capacity: eventsCapacity)
+        UringSelector.deallocateEventsArray(events: events, capacity: eventsCapacity)
         eventsCapacity = ready << 1 // double capacity
-        events = Self.allocateEventsArray(capacity: eventsCapacity)
+        events = UringSelector.allocateEventsArray(capacity: eventsCapacity)
     }
 
     internal func _debugPrint(_ s : @autoclosure () -> String)
@@ -962,7 +962,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
         if Uring.initializedUring == false {
             throw UringError.loadFailure
         }
-        events = Self.allocateEventsArray(capacity: eventsCapacity)
+        events = UringSelector.allocateEventsArray(capacity: eventsCapacity)
 
         try super.init()
 
@@ -977,7 +977,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
     }
 
     deinit {
-        Self.deallocateEventsArray(events: events, capacity: eventsCapacity)
+        UringSelector.deallocateEventsArray(events: events, capacity: eventsCapacity)
 
         assert(self.eventFD == -1, "self.eventFD == \(self.eventFD) on UringSelector deinit, forgot close?")
     }
