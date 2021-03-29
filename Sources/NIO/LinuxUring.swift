@@ -446,7 +446,7 @@ final internal class Uring {
                         case -ENOENT:    // -ENOENT returned for failed poll remove
                             break
                         case -EINVAL:
-                            _debugPrint("Failed with -EINVAL for i[\(i)]")
+                            _debugPrint("io_uring_wait_cqe failed with -EINVAL")
                             break
                         case -EBADF:
                             break
@@ -493,7 +493,7 @@ final internal class Uring {
 
     internal func io_uring_wait_cqe_timeout(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32, timeout: TimeAmount) throws -> Int {
         var ts = timeout.kernelTimespec()
-        var count = 0
+        var eventCount = 0
 
         _debugPrint("io_uring_wait_cqe_timeout.ETIME milliseconds \(ts)")
 
@@ -521,7 +521,7 @@ final internal class Uring {
                             case -ENOENT:    // -ENOENT returned for failed poll remove
                                 break
                             case -EINVAL:
-                                _debugPrint("Failed with -EINVAL for i[\(i)]")
+                                _debugPrint("io_uring_wait_cqe_timeout failed with -EINVAL")
                                 break
                             case -EBADF:
                                 break
@@ -559,7 +559,7 @@ final internal class Uring {
                 throw UringError.uringWaitCqeTimeoutFailure
         }
         
-        return count
+        return eventCount
     }
 }
 
