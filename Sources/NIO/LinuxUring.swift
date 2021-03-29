@@ -300,7 +300,7 @@ final internal class Uring {
             print("L [\(NIOThread.current)] " + s())
         }
     }
-
+    
     internal func io_uring_peek_batch_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) -> Int {
         _debugPrint("io_uring_peek_batch_cqe")
         let mergeCQE = true
@@ -421,7 +421,7 @@ final internal class Uring {
     internal func io_uring_wait_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) throws -> Int {
         _debugPrint("io_uring_wait_cqe")
         let error = CNIOLinux_io_uring_wait_cqe(&ring, cqes)
-        var count = 0
+        var eventCount = 0
         
         if (error == 0)
         {
@@ -431,17 +431,49 @@ final internal class Uring {
             let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
             let result = cqes[0]!.pointee.res
 
-            if (result > 0) {
-                assert(bitPattern > 0, "Bitpattern should never be zero")
-
-                _debugPrint("io_uring_wait_cqe fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
-
-                count = 1
-                events[0].fd = fd
-                events[0].pollMask = UInt32(cqes[0]!.pointee.res)
-            } else {
-                _debugPrint("io_uring_wait_cqe non-positive result fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+            
+            switch eventType {
+                case .poll?:
+                    switch result {
+                        case -ECANCELED: // -ECANCELED for streaming polls, should signal error
+                            assert(fd >= 0, "fd must be greater than zero")
+                            
+                            let pollError = (Uring.POLLHUP | Uring.POLLERR)
+                            events[0].fd = fd
+                            events[0].pollMask = pollError
+                            eventCount += 1
+                            break
+                        case -ENOENT:    // -ENOENT returned for failed poll remove
+                            break
+                        case -EINVAL:
+                            _debugPrint("Failed with -EINVAL for i[\(i)]")
+                            break
+                        case -EBADF:
+                            break
+                        case ..<0: // other errors
+                            _debugPrint("io_uring_wait_cqe non-positive result fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                            break
+                        case 0: // successfull chained add, not an event
+                            break
+                        default: // positive success
+                            assert(bitPattern > 0, "Bitpattern should never be zero")
+                            assert(fd >= 0, "fd must be greater than zero")
+                            let uresult = UInt32(result)
+                            
+                            events[0].fd = fd
+                            events[0].pollMask = uresult
+                            eventCount += 1
+                            
+                            _debugPrint("io_uring_wait_cqe fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                    }
+                case .pollModify?:
+                    break
+                case .pollDelete?:
+                    break
+                default:
+                    assertionFailure("Unknown type")
             }
+
             CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
         }
         else
@@ -456,7 +488,7 @@ final internal class Uring {
             }
         }
         
-        return count
+        return eventCount
     }
 
     internal func io_uring_wait_cqe_timeout(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32, timeout: TimeAmount) throws -> Int {
@@ -475,16 +507,48 @@ final internal class Uring {
                 let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
                 let result = cqes[0]!.pointee.res
 
-                if (result > 0) {
-                    _debugPrint("io_uring_wait_cqe_timeout fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
-
-                    count = 1
-                    events[0].fd = fd
-                    events[0].pollMask = UInt32(cqes[0]!.pointee.res)
-                } else {
-                    _debugPrint("io_uring_wait_cqe_timeout non-positive result fd[\(fd)] eventType[\(String(describing:eventType))]  bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                switch eventType {
+                    case .poll?:
+                        switch result {
+                            case -ECANCELED: // -ECANCELED for streaming polls, should signal error
+                                assert(fd >= 0, "fd must be greater than zero")
+                                
+                                let pollError = (Uring.POLLHUP | Uring.POLLERR)
+                                events[0].fd = fd
+                                events[0].pollMask = pollError
+                                eventCount += 1
+                                break
+                            case -ENOENT:    // -ENOENT returned for failed poll remove
+                                break
+                            case -EINVAL:
+                                _debugPrint("Failed with -EINVAL for i[\(i)]")
+                                break
+                            case -EBADF:
+                                break
+                            case ..<0: // other errors
+                                _debugPrint("io_uring_wait_cqe_timeout non-positive result fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                                break
+                            case 0: // successfull chained add, not an event
+                                break
+                            default: // positive success
+                                assert(bitPattern > 0, "Bitpattern should never be zero")
+                                assert(fd >= 0, "fd must be greater than zero")
+                                let uresult = UInt32(result)
+                                
+                                events[0].fd = fd
+                                events[0].pollMask = uresult
+                                eventCount += 1
+                                
+                                _debugPrint("io_uring_wait_cqe_timeout fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                        }
+                    case .pollModify?:
+                        break
+                    case .pollDelete?:
+                        break
+                    default:
+                        assertionFailure("Unknown type")
                 }
-                
+
                 CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
             case -CNIOLinux.ETIME: // timed out
                 _debugPrint("io_uring_wait_cqe_timeout timed out with -CNIOLinux.ETIME")

@@ -1096,8 +1096,8 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                        _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
 
                     }
-                    
-                    if multishot == false { // must be before guard, otherwise lost wake
+                    // FIXME: No reregistrations for reset events, but we can see clients do reregistrations...
+                    if multishot == false && selectorEvent.contains(.reset) == false { // must be before guard, otherwise lost wake
                         ring.io_uring_prep_poll_add(fd: event.fd, pollMask: registration.interested.uringEventSet, submitNow:false, multishot:false)
                     }
 
