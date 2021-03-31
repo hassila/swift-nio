@@ -505,18 +505,10 @@ final internal class Uring {
                             assert(fd >= 0, "fd must be greater than zero")
                             
                             let pollError = (Uring.POLLHUP | Uring.POLLERR)
-                            if mergeCQE
-                            {
-                                if let current = fdEvents[fd] {
-                                    fdEvents[fd] = current | pollError
-                                } else {
-                                    fdEvents[fd] = pollError
-                                }
-                            } else {
-                                events[eventCount].fd = fd
-                                events[eventCount].pollMask = pollError
-                                eventCount += 1
-                            }
+                            events[0].fd = fd
+                            events[0].pollMask = pollError
+                            eventCount += 1
+
                             break
                         case -EINVAL:
                             _debugPrint("Failed with -EINVAL for i[\(i)]")
@@ -606,23 +598,15 @@ final internal class Uring {
                         }
                     case .pollModify?:
                         switch result {
-                            case -ECANCELED: // -ECANCELED for streaming polls, should signal error
-                                assert(fd >= 0, "fd must be greater than zero")
-                                
-                                let pollError = (Uring.POLLHUP | Uring.POLLERR)
-                                if mergeCQE
-                                {
-                                    if let current = fdEvents[fd] {
-                                        fdEvents[fd] = current | pollError
-                                    } else {
-                                        fdEvents[fd] = pollError
-                                    }
-                                } else {
-                                    events[eventCount].fd = fd
-                                    events[eventCount].pollMask = pollError
-                                    eventCount += 1
-                                }
-                                break
+                        case -ECANCELED: // -ECANCELED for streaming polls, should signal error
+                            assert(fd >= 0, "fd must be greater than zero")
+                            
+                            let pollError = (Uring.POLLHUP | Uring.POLLERR)
+                            events[0].fd = fd
+                            events[0].pollMask = pollError
+                            eventCount += 1
+
+                            break
                             case -EINVAL:
                                 _debugPrint("Failed with -EINVAL for i[\(i)]")
                                 break
