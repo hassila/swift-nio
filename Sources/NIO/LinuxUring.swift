@@ -511,7 +511,7 @@ final internal class Uring {
 
                             break
                         case -EINVAL:
-                            _debugPrint("Failed with -EINVAL for i[\(i)]")
+                            _debugPrint("Failed with -EINVAL pollModify")
                             break
                         case -EBADF:
                             break
@@ -608,7 +608,7 @@ final internal class Uring {
 
                             break
                             case -EINVAL:
-                                _debugPrint("Failed with -EINVAL for i[\(i)]")
+                                _debugPrint("Failed with -EINVAL pollModify")
                                 break
                             case -EBADF:
                                 break
