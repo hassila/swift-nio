@@ -375,6 +375,36 @@ final internal class Uring {
                             }
                     }
                 case .pollModify?:
+                    switch result {
+                        case -ECANCELED: // -ECANCELED for streaming polls, should signal error
+                            assert(fd >= 0, "fd must be greater than zero")
+                            
+                            let pollError = (Uring.POLLHUP | Uring.POLLERR)
+                            if mergeCQE
+                            {
+                                if let current = fdEvents[fd] {
+                                    fdEvents[fd] = current | pollError
+                                } else {
+                                    fdEvents[fd] = pollError
+                                }
+                            } else {
+                                events[eventCount].fd = fd
+                                events[eventCount].pollMask = pollError
+                                eventCount += 1
+                            }
+                            break
+                        case -EINVAL:
+                            _debugPrint("Failed with -EINVAL for i[\(i)]")
+                            break
+                        case -EBADF:
+                            break
+                        case ..<0: // other errors
+                            break
+                        case 0: // successfull chained add, not an event
+                            break
+                        default: // positive success
+                            fatalError("pollModify returned > 0")
+                    }
                     break
                 case .pollDelete?:
                     break
@@ -470,6 +500,36 @@ final internal class Uring {
                             _debugPrint("io_uring_wait_cqe fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
                     }
                 case .pollModify?:
+                    switch result {
+                        case -ECANCELED: // -ECANCELED for streaming polls, should signal error
+                            assert(fd >= 0, "fd must be greater than zero")
+                            
+                            let pollError = (Uring.POLLHUP | Uring.POLLERR)
+                            if mergeCQE
+                            {
+                                if let current = fdEvents[fd] {
+                                    fdEvents[fd] = current | pollError
+                                } else {
+                                    fdEvents[fd] = pollError
+                                }
+                            } else {
+                                events[eventCount].fd = fd
+                                events[eventCount].pollMask = pollError
+                                eventCount += 1
+                            }
+                            break
+                        case -EINVAL:
+                            _debugPrint("Failed with -EINVAL for i[\(i)]")
+                            break
+                        case -EBADF:
+                            break
+                        case ..<0: // other errors
+                            break
+                        case 0: // successfull chained add, not an event
+                            break
+                        default: // positive success
+                            fatalError("pollModify returned > 0")
+                    }
                     break
                 case .pollDelete?:
                     break
@@ -545,6 +605,36 @@ final internal class Uring {
                                 _debugPrint("io_uring_wait_cqe_timeout fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
                         }
                     case .pollModify?:
+                        switch result {
+                            case -ECANCELED: // -ECANCELED for streaming polls, should signal error
+                                assert(fd >= 0, "fd must be greater than zero")
+                                
+                                let pollError = (Uring.POLLHUP | Uring.POLLERR)
+                                if mergeCQE
+                                {
+                                    if let current = fdEvents[fd] {
+                                        fdEvents[fd] = current | pollError
+                                    } else {
+                                        fdEvents[fd] = pollError
+                                    }
+                                } else {
+                                    events[eventCount].fd = fd
+                                    events[eventCount].pollMask = pollError
+                                    eventCount += 1
+                                }
+                                break
+                            case -EINVAL:
+                                _debugPrint("Failed with -EINVAL for i[\(i)]")
+                                break
+                            case -EBADF:
+                                break
+                            case ..<0: // other errors
+                                break
+                            case 0: // successfull chained add, not an event
+                                break
+                            default: // positive success
+                                fatalError("pollModify returned > 0")
+                        }
                         break
                     case .pollDelete?:
                         break
