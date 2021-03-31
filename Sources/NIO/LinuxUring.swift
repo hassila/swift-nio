@@ -346,8 +346,6 @@ final internal class Uring {
                                 eventCount += 1
                             }
                             break
-                        case -ENOENT:    // -ENOENT returned for failed poll remove
-                            break
                         case -EINVAL:
                             _debugPrint("Failed with -EINVAL for i[\(i)]")
                             break
@@ -395,6 +393,21 @@ final internal class Uring {
                                 eventCount += 1
                             }
                             break
+                        case -ENOENT:    // -ENOENT returned for failed poll remove
+                            let pollError = Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
+                            if mergeCQE
+                            {
+                                if let current = fdEvents[fd] {
+                                    fdEvents[fd] = current | pollError
+                                } else {
+                                    fdEvents[fd] = pollError
+                                }
+                            } else {
+                                events[eventCount].fd = fd
+                                events[eventCount].pollMask = pollError
+                                eventCount += 1
+                            }
+                        break
                         case -EINVAL:
                             _debugPrint("Failed with -EINVAL for i[\(i)]")
                             break
@@ -514,6 +527,13 @@ final internal class Uring {
                             eventCount += 1
 
                             break
+                        case -ENOENT:    // -ENOENT returned for failed poll remove
+                            assert(fd >= 0, "fd must be greater than zero")
+                        
+                            let pollError = Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
+                            events[0].fd = fd
+                            events[0].pollMask = pollError
+                            eventCount += 1
                         case -EINVAL:
                             _debugPrint("Failed with -EINVAL pollModify")
                             break
@@ -613,6 +633,13 @@ final internal class Uring {
                                 eventCount += 1
 
                                 break
+                            case -ENOENT:    // -ENOENT returned for failed poll remove
+                                assert(fd >= 0, "fd must be greater than zero")
+                            
+                                let pollError = Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
+                                events[0].fd = fd
+                                events[0].pollMask = pollError
+                                eventCount += 1
                             case -EINVAL:
                                 _debugPrint("Failed with -EINVAL pollModify")
                                 break
