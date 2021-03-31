@@ -1113,6 +1113,8 @@ final internal class UringSelector<R: Registration>: Selector<R> {
 
                     if multishot && event.pollMask == Uring.POLLCANCELLED {
                         ring.io_uring_prep_poll_add(fd: event.fd, pollMask: registration.interested.uringEventSet, submitNow:false, multishot:true)
+                        _debugPrint("Uring.POLLCANCELLED")
+                        continue
                     }
 
                     guard selectorEvent != ._none else {
