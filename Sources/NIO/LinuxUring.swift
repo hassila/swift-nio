@@ -83,6 +83,10 @@ final internal class Uring {
         CNIOLinux.CNIOLinux_io_uring_load() == 0
     }()
 
+    internal static let _debugPrintEnabled: Bool = {
+        getEnvironmentVar("NIO_LINUX") != nil
+    }()    
+
     func dumpCqes(_ header:String, count: Int = 1)
     {
         if count < 0 {
@@ -293,10 +297,10 @@ final internal class Uring {
         guard let rawValue = getenv(name) else { return nil }
         return String(cString: rawValue)
     }
-
+    
     internal func _debugPrint(_ s : @autoclosure () -> String)
     {
-        if getEnvironmentVar("NIO_LINUX") != nil {
+        if Uring._debugPrintEnabled {
             print("L [\(NIOThread.current)] " + s())
         }
     }
@@ -430,7 +434,6 @@ final internal class Uring {
             let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
             let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
             let result = cqes[0]!.pointee.res
-
             
             switch eventType {
                 case .poll?:

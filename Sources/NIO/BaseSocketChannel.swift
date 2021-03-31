@@ -191,12 +191,10 @@ private struct SocketChannelLifecycleManager {
         return self.currentState != .closed
     }
 }
-
-public func _debugPrint(_ s : @autoclosure () -> String)
-{
-    if getEnvironmentVar("NIO_BSC") != nil {
-        print("B [\(NIOThread.current)] " + s())
-    }
+struct BSCDebugPrint {
+    internal static let _debugPrintEnabled: Bool = {
+        getEnvironmentVar("NIO_BSC") != nil
+    }()
 }
 
 /// The base class for all socket-based channels in NIO.
@@ -220,6 +218,13 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
         init(local: SocketAddress?, remote: SocketAddress?) {
             self.local = local
             self.remote = remote
+        }
+    }
+
+    public func _debugPrint(_ s : @autoclosure () -> String)
+    {
+        if BSCDebugPrint._debugPrintEnabled {
+            print("B [\(NIOThread.current)] " + s())
         }
     }
 
