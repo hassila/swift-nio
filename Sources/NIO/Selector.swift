@@ -984,7 +984,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
         ring.io_uring_prep_poll_add(fd: Int32(self.eventFD), pollMask: Uring.POLLIN, multishot:false) // wakeups
 
         self.lifecycleState = .open
-        _debugPrint("UringSelector up and running fd [\(self.selectorFD)]")
+      //  _debugPrint("UringSelector up and running fd [\(self.selectorFD)]")
     }
 
     deinit {
@@ -994,20 +994,20 @@ final internal class UringSelector<R: Registration>: Selector<R> {
     }
 
     override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet) throws {
-        _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
+      //  _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
         
         ring.io_uring_prep_poll_add(fd: Int32(fd), pollMask: interested.uringEventSet, multishot:multishot)
     }
 
     override func _reregister<S: Selectable>(selectable : S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet) throws {
-        _debugPrint("Re-register old \(oldInterested) new \(newInterested) uringEventSet [\(oldInterested.uringEventSet)] reg.uringEventSet [\(newInterested.uringEventSet)]")
+      //  _debugPrint("Re-register old \(oldInterested) new \(newInterested) uringEventSet [\(oldInterested.uringEventSet)] reg.uringEventSet [\(newInterested.uringEventSet)]")
 
         deferredReregistrationsPending = true
         ring.io_uring_poll_update(fd: Int32(fd), newPollmask: newInterested.uringEventSet, oldPollmask:oldInterested.uringEventSet, submitNow:deferReregistrations, multishot:multishot)
     }
 
     override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet) throws {
-        _debugPrint("deregister interested \(selectable) reg.interested.uringEventSet [\(oldInterested.uringEventSet)]")
+      //  _debugPrint("deregister interested \(selectable) reg.interested.uringEventSet [\(oldInterested.uringEventSet)]")
 
         deferredReregistrationsPending = true
         ring.io_uring_prep_poll_remove(fd: Int32(fd), pollMask: oldInterested.uringEventSet, submitNow:deferReregistrations)
@@ -1049,13 +1049,13 @@ final internal class UringSelector<R: Registration>: Selector<R> {
         
         switch strategy {
         case .now:
-            _debugPrint("whenReady.now")
+          //  _debugPrint("whenReady.now")
             ready = Int(ring.io_uring_peek_batch_cqe(events: events, maxevents: UInt32(eventsCapacity)))
         case .blockUntilTimeout(let timeAmount):
-            _debugPrint("whenReady.blockUntilTimeout")
+          //  _debugPrint("whenReady.blockUntilTimeout")
             ready = try Int(ring.io_uring_wait_cqe_timeout(events: events, maxevents: UInt32(eventsCapacity), timeout:timeAmount))
         case .block:
-            _debugPrint("whenReady.block")
+          //  _debugPrint("whenReady.block")
             ready = Int(ring.io_uring_peek_batch_cqe(events: events, maxevents: UInt32(eventsCapacity))) // first try to consume any existing
 
             if (ready <= 0)   // otherwise block (only single supported, but we will use batch peek cqe next run around...
@@ -1071,19 +1071,19 @@ final internal class UringSelector<R: Registration>: Selector<R> {
             let event = events[i]
             switch event.fd {
             case self.eventFD:
-                    _debugPrint("wakeup successful for event.fd [\(event.fd)]")
+                  //  _debugPrint("wakeup successful for event.fd [\(event.fd)]")
                     var val = EventFd.eventfd_t()
                     ring.io_uring_prep_poll_add(fd: Int32(self.eventFD), pollMask: Uring.POLLIN, submitNow: false, multishot:false)
                     do {
                         _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
-                        _debugPrint("read val [\(val)] from event.fd [\(event.fd)]")
+                      //  _debugPrint("read val [\(val)] from event.fd [\(event.fd)]")
                     } catch  { // let errorReturn
                         // FIXME: Add assertion that only EAGAIN is expected here.
                         // assert(errorReturn == EAGAIN, "eventfd_read return unexpected errno \(errorReturn)")
                     }
             default:
                 if let registration = registrations[Int(event.fd)] {
-                    _debugPrint("We found a registration for event.fd [\(event.fd)]") // \(registration)
+                  //  _debugPrint("We found a registration for event.fd [\(event.fd)]") // \(registration)
 
                     if (event.pollMask == Uring.POLLCANCELLED)
                     {
@@ -1098,12 +1098,12 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                     // assert(i != 0 || selectorEvent.isSubset(of: registration.interested), "selectorEvent: \(selectorEvent), registration: \(registration)")
 
                     // in any case we only want what the user is currently registered for & what we got
-                    _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
+                  //  _debugPrint("selectorEvent [\(selectorEvent)] registration.interested [\(registration.interested)]")
                     selectorEvent = selectorEvent.intersection(registration.interested)
-                    _debugPrint("intersection [\(selectorEvent)]")
+                  //  _debugPrint("intersection [\(selectorEvent)]")
 
                     if selectorEvent.contains(.readEOF) {
-                       _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
+                     //  _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
 
                     }
                     // FIXME: No reregistrations for reset events, but we can see clients do reregistrations...
@@ -1113,16 +1113,16 @@ final internal class UringSelector<R: Registration>: Selector<R> {
 
                     if multishot && event.pollMask == Uring.POLLCANCELLED {
                         ring.io_uring_prep_poll_add(fd: event.fd, pollMask: registration.interested.uringEventSet, submitNow:false, multishot:true)
-                        _debugPrint("Uring.POLLCANCELLED")
+                      //  _debugPrint("Uring.POLLCANCELLED")
                         continue
                     }
 
                     guard selectorEvent != ._none else {
-                        _debugPrint("selectorEvent != ._none / [\(selectorEvent)] [\(registration.interested)] [\(SelectorEventSet(uringEvent: event.pollMask))] [\(event.pollMask)] [\(event.fd)]")
+                      //  _debugPrint("selectorEvent != ._none / [\(selectorEvent)] [\(registration.interested)] [\(SelectorEventSet(uringEvent: event.pollMask))] [\(event.pollMask)] [\(event.fd)]")
                         continue
                     }
 
-                    _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask))")
+                  //  _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask))")
 
                     // FIXME: This is only needed due to the edge triggered nature of liburing, possibly
                     // we can get away with only updating (force triggering an event if available) for
@@ -1131,18 +1131,18 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                         ring.io_uring_poll_update(fd: event.fd, newPollmask: registration.interested.uringEventSet, oldPollmask:registration.interested.uringEventSet, submitNow:false)
                     }
 
-//                    _debugPrint("Y [\(NIOThread.current)] running body  [\(event.fd)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask)) [\(registration.interested)]")
+//                  //  _debugPrint("Y [\(NIOThread.current)] running body  [\(event.fd)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask)) [\(registration.interested)]")
                     try body((SelectorEvent(io: selectorEvent, registration: registration)))
                     
                } else { // remove any polling if we don't have a registration for it
-                    _debugPrint("We had no registration for event.fd [\(event.fd)] event.pollMask [\(event.pollMask)] - should be deregistered already deregistrationsHappened[\(deregistrationsHappened)]")
+                  //  _debugPrint("We had no registration for event.fd [\(event.fd)] event.pollMask [\(event.pollMask)] - should be deregistered already deregistrationsHappened[\(deregistrationsHappened)]")
 
 //                    ring.io_uring_prep_poll_remove(fd: event.fd, pollMask: event.pollMask, submitNow:false)
                 }
             }
         }
         if (self.deregistrationsHappened) {
-          _debugPrint("deregistrationsHappened")
+        //  _debugPrint("deregistrationsHappened")
         }
         
         deferredReregistrationsPending = false // none pending as we will flush here
