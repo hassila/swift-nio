@@ -1121,7 +1121,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                         ring.io_uring_poll_update(fd: event.fd, newPollmask: registration.interested.uringEventSet, oldPollmask:registration.interested.uringEventSet, submitNow:false)
                     }
 
-                    _debugPrint("Y [\(NIOThread.current)] running body  [\(event.fd)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask)) [\(registration.interested)]")
+//                    _debugPrint("Y [\(NIOThread.current)] running body  [\(event.fd)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask)) [\(registration.interested)]")
                     try body((SelectorEvent(io: selectorEvent, registration: registration)))
                     
                } else { // remove any polling if we don't have a registration for it
