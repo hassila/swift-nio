@@ -376,7 +376,7 @@ final internal class Uring {
                 case .pollModify?:
                     switch result {
                         case -EALREADY:
-                            fallthrough
+                            break
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
@@ -518,7 +518,7 @@ final internal class Uring {
                 case .pollModify?:
                     switch result {
                         case -EALREADY:
-                            fallthrough
+                            break
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
@@ -624,7 +624,7 @@ final internal class Uring {
                     case .pollModify?:
                         switch result {
                             case -EALREADY:
-                                fallthrough
+                                break
                             case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                                 assert(fd >= 0, "fd must be greater than zero")
                             
