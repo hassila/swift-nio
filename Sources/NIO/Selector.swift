@@ -1085,6 +1085,10 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                 if let registration = registrations[Int(event.fd)] {
                     _debugPrint("We found a registration for event.fd [\(event.fd)]") // \(registration)
 
+                    if (event.pollMask == Uring.POLLCANCELLED)
+                    {
+                        
+                    }
                     var selectorEvent = SelectorEventSet(uringEvent: event.pollMask)
                     // let socketClosing = (event.pollMask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
 
@@ -1103,8 +1107,12 @@ final internal class UringSelector<R: Registration>: Selector<R> {
 
                     }
                     // FIXME: No reregistrations for reset events, but we can see clients do reregistrations...
-                    if multishot == false && shouldRefreshPollForEvent(selectorEvent:selectorEvent) { // must be before guard, otherwise lost wake
+                    if multishot == false && (event.pollMask == Uring.POLLCANCELLED || shouldRefreshPollForEvent(selectorEvent:selectorEvent)) { // must be before guard, otherwise lost wake
                         ring.io_uring_prep_poll_add(fd: event.fd, pollMask: registration.interested.uringEventSet, submitNow:false, multishot:false)
+                    }
+
+                    if multishot && event.pollMask == Uring.POLLCANCELLED {
+                        ring.io_uring_prep_poll_add(fd: event.fd, pollMask: registration.interested.uringEventSet, submitNow:false, multishot:true)
                     }
 
                     guard selectorEvent != ._none else {
@@ -1117,7 +1125,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                     // FIXME: This is only needed due to the edge triggered nature of liburing, possibly
                     // we can get away with only updating (force triggering an event if available) for
                     // partial reads (where we currently give up after 4 iterations)
-                    if multishot && shouldRefreshPollForEvent(selectorEvent:selectorEvent) { // can be after guard as it is multishot
+                    if multishot && (event.pollMask != Uring.POLLCANCELLED || shouldRefreshPollForEvent(selectorEvent:selectorEvent)) { // can be after guard as it is multishot
                         ring.io_uring_poll_update(fd: event.fd, newPollmask: registration.interested.uringEventSet, oldPollmask:registration.interested.uringEventSet, submitNow:false)
                     }
 
