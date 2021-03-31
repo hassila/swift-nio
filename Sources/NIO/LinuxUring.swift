@@ -376,6 +376,8 @@ final internal class Uring {
                     }
                 case .pollModify?:
                     switch result {
+                        case -EALREADY:
+                            fallthrough
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
@@ -501,6 +503,8 @@ final internal class Uring {
                     }
                 case .pollModify?:
                     switch result {
+                        case -EALREADY:
+                            fallthrough
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
@@ -598,15 +602,17 @@ final internal class Uring {
                         }
                     case .pollModify?:
                         switch result {
-                        case -ECANCELED: // -ECANCELED for streaming polls, should signal error
-                            assert(fd >= 0, "fd must be greater than zero")
+                            case -EALREADY:
+                                fallthrough
+                            case -ECANCELED: // -ECANCELED for streaming polls, should signal error
+                                assert(fd >= 0, "fd must be greater than zero")
                             
-                            let pollError = Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
-                            events[0].fd = fd
-                            events[0].pollMask = pollError
-                            eventCount += 1
+                                let pollError = Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
+                                events[0].fd = fd
+                                events[0].pollMask = pollError
+                                eventCount += 1
 
-                            break
+                                break
                             case -EINVAL:
                                 _debugPrint("Failed with -EINVAL pollModify")
                                 break
