@@ -1114,7 +1114,10 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
 
             return readStreamState
         }
-        assert(readResult == .some)
+ // FIXME: We hit this assert with uring when we get 'an extra' POLLIN
+ // likely due to kernel prodding - this leads to the readSocket path that
+        // would block, which makes it return .none
+//        assert(readResult == .some)
 // FIXME: We hit this assert with uring as we can receive multiple
         // socket accept readiness notifications, if we then fail to
         // accept4() as no new connection is availble
