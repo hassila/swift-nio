@@ -332,7 +332,7 @@ final internal class Uring {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
-                            let pollError = (Uring.POLLHUP | Uring.POLLERR)
+                            let pollError = Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             if mergeCQE
                             {
                                 if let current = fdEvents[fd] {
@@ -379,7 +379,7 @@ final internal class Uring {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
-                            let pollError = (Uring.POLLHUP | Uring.POLLERR)
+                            let pollError = Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             if mergeCQE
                             {
                                 if let current = fdEvents[fd] {
@@ -471,7 +471,7 @@ final internal class Uring {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
-                            let pollError = (Uring.POLLHUP | Uring.POLLERR)
+                            let pollError = Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             events[0].fd = fd
                             events[0].pollMask = pollError
                             eventCount += 1
@@ -504,7 +504,7 @@ final internal class Uring {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
-                            let pollError = (Uring.POLLHUP | Uring.POLLERR)
+                            let pollError = Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             events[0].fd = fd
                             events[0].pollMask = pollError
                             eventCount += 1
@@ -568,7 +568,7 @@ final internal class Uring {
                             case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                                 assert(fd >= 0, "fd must be greater than zero")
                                 
-                                let pollError = (Uring.POLLHUP | Uring.POLLERR)
+                                let pollError = Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                                 events[0].fd = fd
                                 events[0].pollMask = pollError
                                 eventCount += 1
@@ -601,7 +601,7 @@ final internal class Uring {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
-                            let pollError = (Uring.POLLHUP | Uring.POLLERR)
+                            let pollError = Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             events[0].fd = fd
                             events[0].pollMask = pollError
                             eventCount += 1
