@@ -1117,7 +1117,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                     // FIXME: This is only needed due to the edge triggered nature of liburing, possibly
                     // we can get away with only updating (force triggering an event if available) for
                     // partial reads (where we currently give up after 4 iterations)
-                    if multishot && shouldRefreshPollForEvent(selectorEvent) { // can be after guard as it is multishot
+                    if multishot && shouldRefreshPollForEvent(selectorEvent:selectorEvent) { // can be after guard as it is multishot
                         ring.io_uring_poll_update(fd: event.fd, newPollmask: registration.interested.uringEventSet, oldPollmask:registration.interested.uringEventSet, submitNow:false)
                     }
 
