@@ -513,7 +513,7 @@ final internal class Uring {
                             events[0].pollMask = uresult
                             eventCount += 1
                             
-                            _debugPrint("io_uring_wait_cqe fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                            _debugPrint("io_uring_wait_cqe fd[\(fd)] events[0].pollMask [\(events[0].pollMask)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
                     }
                 case .pollModify?:
                     switch result {
