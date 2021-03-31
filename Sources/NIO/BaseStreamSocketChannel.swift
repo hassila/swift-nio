@@ -133,6 +133,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                     throw ChannelError.eof
                 }
             case .wouldBlock(let bytesRead):
+                _debugPrint("Read wouldBlock!")
                 assert(bytesRead == 0)
                 return result
             }
