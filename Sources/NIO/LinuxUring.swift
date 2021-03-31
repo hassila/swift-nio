@@ -95,10 +95,10 @@ final internal class Uring {
     func dumpCqes(_ header:String, count: Int = 1)
     {
         func _debugPrintCQE(_ s : String) {
-            print("Q [\(NIOThread.current)] " + s())
+            print("Q [\(NIOThread.current)] " + s)
         }
         
-        if count < 0 || _debugPrintEnabledCQE == false {
+        if count < 0 || Uring._debugPrintEnabledCQE == false {
             return
         }
 
