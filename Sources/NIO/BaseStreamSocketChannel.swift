@@ -98,7 +98,8 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
             buffer.clear()
             switch try buffer.withMutableWritePointer(body: { try self.socket.read(pointer: $0) }) {
             case .processed(let bytesRead):
-                if bytesRead > 0 {
+                _debugPrint("Read [\(bytesRead)] from socket")
+                if bytesRead > 0{
                     let mayGrow = recvAllocator.record(actualReadBytes: bytesRead)
 
                     self.readPending = false
@@ -110,8 +111,9 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                     if buffer.writableBytes > 0 {
                         // If we did not fill the whole buffer with read(...) we should stop reading and wait until we get notified again.
                         // Otherwise chances are good that the next read(...) call will either read nothing or only a very small amount of data.
-                        // Also this will allow us to call fireChannelReadComplete() which may give the user the chance to flush out all pending
+                        // Als o this will allow us to call fireChannelReadComplete() which may give the user the chance to flush out all pending
                         // writes.
+                        _debugPrint("Read throw buffer.writableBytes[\(buffer.writableBytes)]] result[\(result)]")
                         return result
                     } else if mayGrow && i < self.maxMessagesPerRead {
                         // if the ByteBuffer may grow on the next allocation due we used all the writable bytes we should allocate a new `ByteBuffer` to allow ramping up how much data
@@ -119,12 +121,14 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                         buffer = self.recvAllocator.buffer(allocator: allocator)
                     }
                 } else {
+                    _debugPrint("Read self.inputShutdown [\(self.inputShutdown)]")
                     if self.inputShutdown {
                         // We received a EOF because we called shutdown on the fd by ourself, unregister from the Selector and return
                         self.readPending = false
                         self.unregisterForReadable()
                         return result
                     }
+                    _debugPrint("Read throw ChannelError.eof")
                     // end-of-file
                     throw ChannelError.eof
                 }
@@ -133,6 +137,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                 return result
             }
         }
+        _debugPrint("Read return result [\(result)]")
         return result
     }
 

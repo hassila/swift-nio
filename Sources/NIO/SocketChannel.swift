@@ -230,7 +230,7 @@ final class ServerSocketChannel: BaseSocketChannel<ServerSocket> {
     override func finishConnectSocket() throws {
         throw ChannelError.operationUnsupported
     }
-
+    
     override func readFromSocket() throws -> ReadResult {
         var result = ReadResult.none
         for _ in 1...maxMessagesPerRead {
