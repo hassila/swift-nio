@@ -1019,7 +1019,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
             // new events, would be even better if we knew if we had read all there is
             return true
         }
-
+// FIXME: Need to verify that SwiftNIO writes until blocking (exhaustive writing)
         return false
     }
 

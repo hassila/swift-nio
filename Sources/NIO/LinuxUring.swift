@@ -88,17 +88,21 @@ final internal class Uring {
         getEnvironmentVar("NIO_LINUX") != nil
     }()    
 
+    internal static let _debugPrintEnabledCQE: Bool = {
+        getEnvironmentVar("NIO_DUMPCQE") != nil
+    }()
+
     func dumpCqes(_ header:String, count: Int = 1)
     {
-        if count < 0 {
-            return
+        func _debugPrintCQE(_ s : String) {
+            print("Q [\(NIOThread.current)] " + s())
         }
         
-        if getEnvironmentVar("NIO_DUMPCQE") == nil {
+        if count < 0 || _debugPrintEnabledCQE == false {
             return
         }
 
-        _debugPrint(header + " CQE:s [\(cqes)] - ring flags are [\(ring.flags)]")
+        _debugPrintCQE(header + " CQE:s [\(cqes)] - ring flags are [\(ring.flags)]")
         for i in 0..<count {
             let c = cqes[i]!.pointee
 
@@ -110,7 +114,7 @@ final internal class Uring {
 
             let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
 
-            _debugPrint("\(i) = fd[\(fd)] eventType[\(String(describing:CqeEventType(rawValue:eventType)))] res [\(c.res)] flags [\(c.flags)]  bitpattern[\(String(describing:bitpatternAsPointer))]")
+            _debugPrintCQE("\(i) = fd[\(fd)] eventType[\(String(describing:CqeEventType(rawValue:eventType)))] res [\(c.res)] flags [\(c.flags)]  bitpattern[\(String(describing:bitpatternAsPointer))]")
         }
     }
 
