@@ -996,6 +996,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
             self.safeReregister(interested: self.interestedEvent.subtracting(.readEOF))
 
             loop: while self.lifecycleManager.isActive {
+                _debugPrint("readEOF0 -> switch self.readable0()")
                 switch self.readable0() {
                 case .eof:
                     // on EOF we stop the loop and we're done with our processing for `readEOF`.
@@ -1021,6 +1022,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
     // other words: Failing to unregister the whole selector will cause NIO to spin at 100% CPU constantly delivering
     // the `reset` event.
     final func reset() {
+        _debugPrint("reset -> readEOF0")
         self.readEOF0()
 
         if self.socket.isOpen {
@@ -1071,8 +1073,11 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
         let readResult: ReadResult
         do {
             readResult = try self.readFromSocket()
+            _debugPrint("readResult = try self.readFromSocket() [\(readResult)]")
+
 //            _debugPrint("readable0 self.readFromSocket() readResult[\(readResult)]")
         } catch let err {
+            _debugPrint("readResult = try self.readFromSocket() catch let err [\(err)]")
             let readStreamState: ReadStreamState
             // ChannelError.eof is not something we want to fire through the pipeline as it just means the remote
             // peer closed / shutdown the connection.

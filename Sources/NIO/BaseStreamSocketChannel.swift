@@ -113,7 +113,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                         // Otherwise chances are good that the next read(...) call will either read nothing or only a very small amount of data.
                         // Als o this will allow us to call fireChannelReadComplete() which may give the user the chance to flush out all pending
                         // writes.
-                        _debugPrint("Read throw buffer.writableBytes[\(buffer.writableBytes)]] result[\(result)]")
+                        _debugPrint("Read has buffer.writableBytes[\(buffer.writableBytes)]] result[\(result)]")
                         return result
                     } else if mayGrow && i < self.maxMessagesPerRead {
                         // if the ByteBuffer may grow on the next allocation due we used all the writable bytes we should allocate a new `ByteBuffer` to allow ramping up how much data
