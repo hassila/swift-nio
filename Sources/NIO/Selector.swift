@@ -915,6 +915,12 @@ internal func getEnvironmentVar(_ name: String) -> String? {
     return String(cString: rawValue)
 }
 
+struct UringSelectorDebug {
+    internal static let _debugPrintEnabled: Bool = {
+        getEnvironmentVar("NIO_SELECTOR") != nil
+    }()
+}
+
 final internal class UringSelector<R: Registration>: Selector<R> {
     #if os(Linux)
     private typealias EventType = UringEvent
@@ -955,14 +961,9 @@ final internal class UringSelector<R: Registration>: Selector<R> {
         events = UringSelector.allocateEventsArray(capacity: eventsCapacity)
     }
 
-    internal static let _debugPrintEnabled: Bool = {
-        getEnvironmentVar("NIO_SELECTOR") != nil
-    }()
-    
-
     internal func _debugPrint(_ s : @autoclosure () -> String)
     {
-        if UringSelector._debugPrintEnabled {
+        if UringSelectorDebug._debugPrintEnabled {
             print("S [\(NIOThread.current)] " + s())
         }
     }
@@ -1102,7 +1103,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
 
                     }
                     // FIXME: No reregistrations for reset events, but we can see clients do reregistrations...
-                    if multishot == false && shouldRefreshPollForEvent(selectorEvent) { // must be before guard, otherwise lost wake
+                    if multishot == false && shouldRefreshPollForEvent(selectorEvent:selectorEvent) { // must be before guard, otherwise lost wake
                         ring.io_uring_prep_poll_add(fd: event.fd, pollMask: registration.interested.uringEventSet, submitNow:false, multishot:false)
                     }
 

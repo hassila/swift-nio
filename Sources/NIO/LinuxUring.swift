@@ -47,6 +47,7 @@ internal struct UringEvent {
     var fd : Int32
     var pollMask : UInt32
 }
+
 // FIXME: Current significant malloc regressions vs epoll:
 // These seem to all be due to debugg logging (I updated debugging-allocations.md)
 // Should verify again, but should be ok after debug logs are eliminated. 
@@ -293,11 +294,6 @@ final internal class Uring {
         }
     }
 
-    internal func getEnvironmentVar(_ name: String) -> String? {
-        guard let rawValue = getenv(name) else { return nil }
-        return String(cString: rawValue)
-    }
-    
     internal func _debugPrint(_ s : @autoclosure () -> String)
     {
         if Uring._debugPrintEnabled {
