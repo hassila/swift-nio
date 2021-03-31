@@ -70,7 +70,6 @@ final internal class Uring {
     internal static let POLLERR: CUnsignedInt = numericCast(CNIOLinux.POLLERR)
     internal static let POLLRDHUP: CUnsignedInt = numericCast(CNIOLinux.EPOLLRDHUP.rawValue) // FIXME: - POLLRDHUP not in ubuntu headers?!
     internal static let POLLHUP: CUnsignedInt = numericCast(CNIOLinux.POLLHUP)
-    internal static let POLLCANCELLED: CUnsignedInt = 0xffffffff
 
     private var ring = io_uring()
     // FIXME: These should be tunable somewhere, somehow. Maybe environment vars are ok, need to discuss with SwiftNIO team.
@@ -333,7 +332,7 @@ final internal class Uring {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
-                            let pollError = Uring.POLLCANCELLED // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
+                            let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             if mergeCQE
                             {
                                 if let current = fdEvents[fd] {
@@ -380,7 +379,7 @@ final internal class Uring {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
-                            let pollError = Uring.POLLCANCELLED // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
+                            let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             if mergeCQE
                             {
                                 if let current = fdEvents[fd] {
@@ -487,7 +486,7 @@ final internal class Uring {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
-                            let pollError = Uring.POLLCANCELLED // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
+                            let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             events[0].fd = fd
                             events[0].pollMask = pollError
                             eventCount += 1
@@ -522,7 +521,7 @@ final internal class Uring {
                         case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                             assert(fd >= 0, "fd must be greater than zero")
                             
-                            let pollError = Uring.POLLCANCELLED // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
+                            let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             events[0].fd = fd
                             events[0].pollMask = pollError
                             eventCount += 1
@@ -593,7 +592,7 @@ final internal class Uring {
                             case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                                 assert(fd >= 0, "fd must be greater than zero")
                                 
-                                let pollError = Uring.POLLCANCELLED // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
+                                let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                                 events[0].fd = fd
                                 events[0].pollMask = pollError
                                 eventCount += 1
@@ -628,7 +627,7 @@ final internal class Uring {
                             case -ECANCELED: // -ECANCELED for streaming polls, should signal error
                                 assert(fd >= 0, "fd must be greater than zero")
                             
-                                let pollError = Uring.POLLCANCELLED // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
+                                let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                                 events[0].fd = fd
                                 events[0].pollMask = pollError
                                 eventCount += 1
