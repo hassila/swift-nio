@@ -996,21 +996,21 @@ final internal class UringSelector<R: Registration>: Selector<R> {
     override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet) throws {
         _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
         
-        ring.io_uring_prep_poll_add(fd: Int32(fd), pollMask: interested.uringEventSet, multishot:multishot)
+        ring.io_uring_prep_poll_add(fd: Int32(fd), pollMask: interested.uringEventSet, submitNow:!deferReregistrations, multishot:multishot)
     }
 
     override func _reregister<S: Selectable>(selectable : S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet) throws {
         _debugPrint("Re-register old \(oldInterested) new \(newInterested) uringEventSet [\(oldInterested.uringEventSet)] reg.uringEventSet [\(newInterested.uringEventSet)]")
 
         deferredReregistrationsPending = true
-        ring.io_uring_poll_update(fd: Int32(fd), newPollmask: newInterested.uringEventSet, oldPollmask:oldInterested.uringEventSet, submitNow:deferReregistrations, multishot:multishot)
+        ring.io_uring_poll_update(fd: Int32(fd), newPollmask: newInterested.uringEventSet, oldPollmask:oldInterested.uringEventSet, submitNow:!deferReregistrations, multishot:multishot)
     }
 
     override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet) throws {
         _debugPrint("deregister interested \(selectable) reg.interested.uringEventSet [\(oldInterested.uringEventSet)]")
 
         deferredReregistrationsPending = true
-        ring.io_uring_prep_poll_remove(fd: Int32(fd), pollMask: oldInterested.uringEventSet, submitNow:deferReregistrations)
+        ring.io_uring_prep_poll_remove(fd: Int32(fd), pollMask: oldInterested.uringEventSet, submitNow:!deferReregistrations)
     }
     
     private func shouldRefreshPollForEvent(selectorEvent:SelectorEventSet) -> Bool {
