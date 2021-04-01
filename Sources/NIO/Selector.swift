@@ -1069,6 +1069,9 @@ final internal class UringSelector<R: Registration>: Selector<R> {
 
         for i in 0..<ready {
             let event = events[i]
+            if self.deregistrationsHappened && event.fd != self.eventFD {
+                continue
+            }
             switch event.fd {
             case self.eventFD:
                     _debugPrint("wakeup successful for event.fd [\(event.fd)]")
