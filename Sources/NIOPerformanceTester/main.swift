@@ -588,12 +588,12 @@ measureAndPrint(desc: "http1_100k_reqs_1_conn") {
     return try! repeatedRequestsHandler.wait()
 }
 
-measureAndPrint(desc: "http1_100k_reqs_100_conns") {
+measureAndPrint(desc: "http1_100k_reqs_1000_conns") {
     var reqs: [Int] = []
-    let reqsPerConn = 100
+    let reqsPerConn = 1000
     reqs.reserveCapacity(reqsPerConn)
     for _ in 0..<reqsPerConn {
-        let repeatedRequestsHandler = RepeatedRequests(numberOfRequests: 1000, eventLoop: group.next())
+        let repeatedRequestsHandler = RepeatedRequests(numberOfRequests: 100, eventLoop: group.next())
 
         let clientChannel = try! ClientBootstrap(group: group)
             .channelInitializer { channel in
