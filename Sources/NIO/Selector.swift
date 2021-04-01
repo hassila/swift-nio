@@ -1165,6 +1165,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
     /* attention, this may (will!) be called from outside the event loop, ie. can't access mutable shared state (such as `self.open`) */
     override func wakeup() throws {
         assert(NIOThread.current != self.myThread)
+        _debugPrint("wakeup()")
         try self.externalSelectorFDLock.withLock {
                 guard self.eventFD >= 0 else {
                     throw EventLoopError.shutdown
