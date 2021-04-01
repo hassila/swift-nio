@@ -1020,7 +1020,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
             return true
         }
 // FIXME: Need to verify that SwiftNIO writes until blocking (exhaustive writing)
-        return true
+        return false
     }
 
     /// Apply the given `SelectorStrategy` and execute `body` once it's complete (which may produce `SelectorEvent`s to handle).
