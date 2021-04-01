@@ -73,8 +73,8 @@ final internal class Uring {
 
     private var ring = io_uring()
     // FIXME: These should be tunable somewhere, somehow. Maybe environment vars are ok, need to discuss with SwiftNIO team.
-    private let ringEntries: CUnsignedInt = 8192 // this is a very large number due to some of the test that does 1K registration mods
-    private let cqeMaxCount : UInt32 = 8192 // shouldn't be more than ringEntries, this is the max chunk of CQE we take.
+    private let ringEntries: CUnsignedInt = 4096 // this is fairly large number due to some of the test that does 1K registration mods
+    private let cqeMaxCount : UInt32 = 4096 // shouldn't be more than ringEntries, this is the max chunk of CQE we take.
         
     var cqes : UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>
     var fdEvents = [Int32: UInt32]() // fd : event_poll_return
@@ -143,6 +143,7 @@ final internal class Uring {
         // instead of starting one thread per core in the multithreaded event loop
         // or allowing customization of whether to use SQPOLL somewhere higher up.
         // Also, current IORING_SETUP_SQPOLL requires correct privileges to run (root or specific privs set)
+        // This limitation is lifted in 5.13.
         if (CNIOLinux.CNIOLinux_io_uring_queue_init(ringEntries, &ring, 0 ) != 0) // IORING_SETUP_SQPOLL
          {
              throw UringError.uringSetupFailure
