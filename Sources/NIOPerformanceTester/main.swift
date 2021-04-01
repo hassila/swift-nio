@@ -571,8 +571,8 @@ try measureAndPrint(desc: "no-net_http1_10k_reqs_1_conn") {
     return requestsDone
 }
 
-measureAndPrint(desc: "http1_100k_reqs_1_conn") {
-    let repeatedRequestsHandler = RepeatedRequests(numberOfRequests: 100_000, eventLoop: group.next())
+measureAndPrint(desc: "http1_10k_reqs_1_conn") {
+    let repeatedRequestsHandler = RepeatedRequests(numberOfRequests: 10_000, eventLoop: group.next())
 
     let clientChannel = try! ClientBootstrap(group: group)
         .channelInitializer { channel in
@@ -588,9 +588,9 @@ measureAndPrint(desc: "http1_100k_reqs_1_conn") {
     return try! repeatedRequestsHandler.wait()
 }
 
-measureAndPrint(desc: "http1_100k_reqs_1000_conns") {
+measureAndPrint(desc: "http1_10k_reqs_100_conns") {
     var reqs: [Int] = []
-    let reqsPerConn = 1000
+    let reqsPerConn = 100
     reqs.reserveCapacity(reqsPerConn)
     for _ in 0..<reqsPerConn {
         let repeatedRequestsHandler = RepeatedRequests(numberOfRequests: 100, eventLoop: group.next())
