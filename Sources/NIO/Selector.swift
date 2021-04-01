@@ -1120,6 +1120,10 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                     if multishot && shouldRefreshPollForEvent(selectorEvent:selectorEvent) { // can be after guard as it is multishot
                         ring.io_uring_poll_update(fd: event.fd, newPollmask: registration.interested.uringEventSet, oldPollmask:registration.interested.uringEventSet, submitNow:false)
                     }
+                    
+                    if deregistrationsHappened {
+                        continue
+                    }
 
 //                    _debugPrint("Y [\(NIOThread.current)] running body  [\(event.fd)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask)) [\(registration.interested)]")
                     try body((SelectorEvent(io: selectorEvent, registration: registration)))
