@@ -68,6 +68,11 @@ internal struct UringEvent {
 struct fdEventKey: Hashable {
     var fd : Int32
     var sequenceIdentifier : UInt32
+    
+    init(_ f: Int32, _ s : UInt32) {
+        self.fd = f
+        self.sequenceIdentifier = s
+    }
 }
 
 final internal class Uring {
