@@ -998,6 +998,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
 
     override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
         _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)] sequenceIdentifier[\(sequenceIdentifier)]")
+        deferredReregistrationsPending = true
         ring.io_uring_prep_poll_add(fd: Int32(fd),
                                     pollMask: interested.uringEventSet,
                                     sequenceIdentifier: sequenceIdentifier,
