@@ -120,7 +120,7 @@ final internal class Uring {
             
             let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
 
-            _debugPrintCQE("\(i) = fd[\(fd)] eventType[\(eventType)] sequenceNumber[\(sequenceNumber)] res [\(c.res)] flags [\(c.flags)]  bitpattern[\(String(describing:bitpatternAsPointer))]")
+            _debugPrintCQE("\(i) = fd[\(fd)] eventType[\(String(describing:eventType))] sequenceNumber[\(sequenceNumber)] res [\(c.res)] flags [\(c.flags)]  bitpattern[\(String(describing:bitpatternAsPointer))]")
         }
     }
 
@@ -237,7 +237,7 @@ final internal class Uring {
 
     internal func io_uring_prep_poll_add(fd: Int32, pollMask: UInt32, sequenceIdentifier: UInt32, submitNow: Bool = true, multishot: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
-        let upperQuad : Int = CqeEventType.poll.rawValue << 24 + (sequenceIdentifier & 0x00FFFFFF)
+        let upperQuad : Int = Int(CqeEventType.poll.rawValue) << 24 + (Int(sequenceIdentifier) & 0x00FFFFFF)
         let bitPattern : Int = upperQuad << 32 + Int(fd)
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
 
@@ -264,10 +264,10 @@ final internal class Uring {
     
     internal func io_uring_prep_poll_remove(fd: Int32, pollMask: UInt32, sequenceIdentifier: UInt32, submitNow: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
-        let upperQuad : Int = CqeEventType.poll.rawValue << 24 + (sequenceIdentifier & 0x00FFFFFF)
+        let upperQuad : Int = Int(CqeEventType.poll.rawValue) << 24 + (Int(sequenceIdentifier) & 0x00FFFFFF)
         let bitPattern : Int = upperQuad << 32 + Int(fd)
 //        let bitPattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd) // must be same as the poll for liburing to match
-        let upperQuadDelete : Int = CqeEventType.pollDelete.rawValue << 24 + (sequenceIdentifier & 0x00FFFFFF)
+        let upperQuadDelete : Int = Int(CqeEventType.pollDelete.rawValue) << 24 + (Int(sequenceIdentifier) & 0x00FFFFFF)
         let userbitPattern : Int = upperQuadDelete << 32 + Int(fd)
 //        let userbitPattern : Int = CqeEventType.pollDelete.rawValue << 32 + Int(fd)
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
@@ -285,8 +285,10 @@ final internal class Uring {
 
     internal func io_uring_poll_update(fd: Int32, newPollmask: UInt32, oldPollmask: UInt32, sequenceIdentifier: UInt32, submitNow: Bool = true, multishot : Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
-        let upperQuad : Int = CqeEventType.poll.rawValue << 24 + (sequenceIdentifier & 0x00FFFFFF)
-        let upperQuadModify : Int = CqeEventType.pollModify.rawValue << 24 + (sequenceIdentifier & 0x00FFFFFF)
+//        let upperQuad : Int = CqeEventType.poll.rawValue << 24 + (sequenceIdentifier & 0x00FFFFFF)
+        let upperQuad : Int = Int(CqeEventType.poll.rawValue) << 24 + (Int(sequenceIdentifier) & 0x00FFFFFF)
+//        let upperQuadModify : Int = CqeEventType.pollModify.rawValue << 24 + (sequenceIdentifier & 0x00FFFFFF)
+        let upperQuadModify : Int = Int(CqeEventType.pollModify.rawValue) << 24 + (Int(sequenceIdentifier) & 0x00FFFFFF)
         let oldBitpattern : Int = upperQuad << 32 + Int(fd)
         let newBitpattern : Int = upperQuad << 32 + Int(fd)
         let userbitPattern : Int = upperQuadModify << 32 + Int(fd)
