@@ -235,7 +235,7 @@ extension EpollFilterSet {
 extension UringFilterSet {
     /// Convert NIO's `SelectorEventSet` set to a `UringFilterSet`
     init(selectorEventSet: SelectorEventSet) {
-        var thing: UringFilterSet = [.error, .hangup, .readHangup]
+        var thing: UringFilterSet = [.error, .hangup]
         if selectorEventSet.contains(.read) {
             thing.formUnion(.input)
         }
@@ -294,7 +294,7 @@ extension UringFilterSet {
         var uringEventSet: UInt32 {
             assert(self != ._none)
             // POLLERR | POLLHUP is always set unconditionally anyway but it's easier to understand if we explicitly ask.
-            var filter: UInt32 = Uring.POLLERR | Uring.POLLHUP | Uring.POLLRDHUP
+            var filter: UInt32 = Uring.POLLERR | Uring.POLLHUP
             let uringFilters = UringFilterSet(selectorEventSet: self)
             if uringFilters.contains(.input) {
                 filter |= Uring.POLLIN
