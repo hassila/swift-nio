@@ -467,7 +467,7 @@ final internal class Uring {
 
         io_uring_cq_advance(&ring, currentCqeCount) // bulk variant of io_uring_cqe_seen(&ring, dataPointer)
 
-        //  if running with merging, just return single event per fd,
+        //  if running with merging, just return single event per fd, sequencenumber pair
         if mergeCQE {
             eventCount = 0
             for (eventKey, result_mask) in fdEvents {
