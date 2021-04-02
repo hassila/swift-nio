@@ -161,7 +161,7 @@ final internal class Uring {
         // or allowing customization of whether to use SQPOLL somewhere higher up.
         // Also, current IORING_SETUP_SQPOLL requires correct privileges to run (root or specific privs set)
         // This limitation is lifted in 5.13.
-        if (CNIOLinux.CNIOLinux_io_uring_queue_init(ringEntries, &ring, 0 ) != 0) // IORING_SETUP_SQPOLL
+        if (CNIOLinux.CNIOLinux_io_uring_queue_init(ringEntries, &ring, IORING_SETUP_SQPOLL ) != 0) // IORING_SETUP_SQPOLL
          {
              throw UringError.uringSetupFailure
          }

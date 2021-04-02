@@ -275,7 +275,7 @@ int CNIOLinux_io_uring_queue_init(unsigned entries, struct io_uring *ring,
     
     pthread_once(&uring_once_control, shared_uring_setup);
 
-    if (flags & IOURING_SETUP_SQPOLL) // if setting up SQPOLL, use shared kernel thread
+    if (flags & IORING_SETUP_SQPOLL) // if setting up SQPOLL, use shared kernel thread
     {
         struct io_uring_params params;
         memset(&params, 0, sizeof(params));
