@@ -125,7 +125,8 @@ final internal class Uring {
 
             let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
             let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) & 0x00FFFFFF)
-            let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) & 0xFF000000) // shift out the fd
+//            let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) & 0xFF000000) // shift out the fd
+            let eventType = CqeEventType(rawValue:((Int(bitPattern) >> 32) & 0xFF000000) >> 24) // shift out the fd
 
             
             let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
@@ -350,7 +351,7 @@ final internal class Uring {
             let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[Int(i)]))
             let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
             let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) & 0x00FFFFFF)
-            let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) & 0xFF000000) // shift out the fd
+            let eventType = CqeEventType(rawValue:((Int(bitPattern) >> 32) & 0xFF000000) >> 24) // shift out the fd
             let result = cqes[Int(i)]!.pointee.res
 
             switch eventType {
@@ -509,7 +510,8 @@ final internal class Uring {
             let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[0]))
             let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
             let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) & 0x00FFFFFF)
-            let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) & 0xFF000000) // shift out the fd
+//            let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) & 0xFF000000) // shift out the fd
+            let eventType = CqeEventType(rawValue:((Int(bitPattern) >> 32) & 0xFF000000) >> 24) // shift out the fd
 //            let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
             let result = cqes[0]!.pointee.res
             
@@ -621,7 +623,8 @@ final internal class Uring {
                 let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[0]))
                 let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
                 let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) & 0x00FFFFFF)
-                let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) & 0xFF000000) // shift out the fd
+//                let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) & 0xFF000000) // shift out the fd
+                let eventType = CqeEventType(rawValue:((Int(bitPattern) >> 32) & 0xFF000000) >> 24) // shift out the fd
 //                let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
                 let result = cqes[0]!.pointee.res
 
