@@ -348,7 +348,7 @@ internal class Selector<R: Registration> {
     // writes: `self.externalSelectorFDLock` AND access from the EventLoop thread
     fileprivate var selectorFD: CInt = -1 // -1 == we're closed
     fileprivate let myThread: NIOThread
-    private var currentSelectableSequenceIdentifier : UInt32 = 0
+    fileprivate var currentSelectableSequenceIdentifier : UInt32 = 0
 
     internal func testsOnly_withUnsafeSelectorFD<T>(_ body: (CInt) throws -> T) throws -> T {
         assert(self.myThread != NIOThread.current)

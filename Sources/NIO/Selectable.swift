@@ -26,4 +26,5 @@
 protocol Selectable {
     func withUnsafeHandle<T>(_: (NIOBSDSocket.Handle) throws -> T) throws -> T
     mutating func setSelectableSequenceIdentifier(identifier: UInt32)
+    var selectableSequenceIdentifier : UInt32 { get }
 }
