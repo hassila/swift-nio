@@ -46,7 +46,7 @@ internal extension TimeAmount {
 internal struct UringEvent {
     var fd : Int32
     var pollMask : UInt32
-    var sequenceIdentifier : UInt32
+    var sequenceNumber : UInt32
 }
 
 // FIXME: Current significant malloc regressions vs epoll:

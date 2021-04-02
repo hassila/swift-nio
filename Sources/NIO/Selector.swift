@@ -407,7 +407,9 @@ internal class Selector<R: Registration> {
             try self._register(selectable : selectable, fd: Int(fd), interested: interested)
 
             registrations[Int(fd)] = makeRegistration(interested)
-            registrations[Int(fd)]?.setSelectableSequenceIdentifier(currentSelectableSequenceIdentifier)
+            registrations[Int(fd)]?.selectableSequenceIdentifier = currentSelectableSequenceIdentifier
+            
+//            registrations[Int(fd)]?.setSelectableSequenceIdentifier(identifier: currentSelectableSequenceIdentifier)
         }
     }
 

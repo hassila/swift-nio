@@ -65,6 +65,7 @@ import CNIOWindows
 protocol Registration {
     /// The `SelectorEventSet` in which the `Registration` is interested.
     var interested: SelectorEventSet { get set }
+//    mutating func setSelectableSequenceIdentifier(identifier: UInt32)
     var selectableSequenceIdentifier: UInt32 { get set }
 }
 
