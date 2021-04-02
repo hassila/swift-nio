@@ -203,6 +203,7 @@ class StreamChannelTest: XCTestCase {
 
     func testHalfCloseOwnOutput() throws {
         func runTest(chan1: Channel, chan2: Channel) throws {
+            print("testHalfCloseOwnOutput RUNTEST \(chan1) \(chan2)")
             let readPromise = chan2.eventLoop.makePromise(of: Void.self)
             let eofPromise = chan1.eventLoop.makePromise(of: Void.self)
 
@@ -230,6 +231,7 @@ class StreamChannelTest: XCTestCase {
 
     func testHalfCloseOwnInput() {
         func runTest(chan1: Channel, chan2: Channel) throws {
+            print("testHalfCloseOwnInput RUNTEST \(chan1) \(chan2)")
 
             let readPromise = chan1.eventLoop.makePromise(of: Void.self)
 
