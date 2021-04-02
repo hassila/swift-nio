@@ -1083,9 +1083,9 @@ final internal class UringSelector<R: Registration>: Selector<R> {
 
         for i in 0..<ready {
             let event = events[i]
-            if self.deregistrationsHappened && event.fd != self.eventFD {
-                continue
-            }
+//            if self.deregistrationsHappened && event.fd != self.eventFD {
+//                continue
+//            }
             switch event.fd {
             case self.eventFD:
                     _debugPrint("wakeup successful for event.fd [\(event.fd)]")
@@ -1105,6 +1105,11 @@ final internal class UringSelector<R: Registration>: Selector<R> {
             default:
                 if let registration = registrations[Int(event.fd)] {
                     _debugPrint("We found a registration for event.fd [\(event.fd)]") // \(registration)
+
+                    if event.sequenceIdentifier !=  registration.selectableSequenceIdentifier {
+                        _debugPrint("The event.sequenceIdentifier [\(event.sequenceIdentifier)] !=  registration.selectableSequenceIdentifier [\(registration.selectableSequenceIdentifier)], skipping to next event")
+                        continue
+                    }
 
                     var selectorEvent = SelectorEventSet(uringEvent: event.pollMask)
                     // let socketClosing = (event.pollMask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
@@ -1137,7 +1142,6 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                         continue
                     }
 
-
                     // FIXME: This is only needed due to the edge triggered nature of liburing, possibly
                     // we can get away with only updating (force triggering an event if available) for
                     // partial reads (where we currently give up after 4 iterations)
@@ -1149,11 +1153,6 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                                                   submitNow: false)
                     }
                     
-                    if event.sequenceIdentifier !=  registration.selectableSequenceIdentifier {
-                        _debugPrint("event.sequenceIdentifier [\(event.sequenceIdentifier)] !=  registration.selectableSequenceIdentifier [\(registration.selectableSequenceIdentifier)]")
-                        continue
-                    }
-
                     _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask))")
 
 //                    _debugPrint("Y [\(NIOThread.current)] running body  [\(event.fd)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask)) [\(registration.interested)]")
