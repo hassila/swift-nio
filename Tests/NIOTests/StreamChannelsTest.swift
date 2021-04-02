@@ -214,6 +214,8 @@ class StreamChannelTest: XCTestCase {
             XCTAssertNoThrow(try chan2.close(mode: .output).wait())
             XCTAssertNoThrow(try eofPromise.futureResult.wait())
 
+            print("testHalfCloseOwnOutput RUNTEST self.buffer.writeString")
+
             self.buffer.writeString("X")
             XCTAssertNoThrow(try chan2.pipeline.addHandler(FulfillOnFirstEventHandler(channelReadPromise: readPromise)).wait())
 
@@ -239,6 +241,7 @@ class StreamChannelTest: XCTestCase {
             // let's close chan2's input
             XCTAssertNoThrow(try chan2.close(mode: .input).wait())
 
+            print("testHalfCloseOwnInput RUNTEST self.buffer.writeString")
             self.buffer.writeString("X")
             XCTAssertNoThrow(try chan1.pipeline.addHandler(FulfillOnFirstEventHandler(channelReadPromise: readPromise)).wait())
 
