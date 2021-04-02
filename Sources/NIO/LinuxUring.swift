@@ -46,6 +46,7 @@ internal extension TimeAmount {
 internal struct UringEvent {
     var fd : Int32
     var pollMask : UInt32
+    var sequenceIdentifier : UInt32
 }
 
 // FIXME: Current significant malloc regressions vs epoll:
@@ -109,12 +110,17 @@ final internal class Uring {
             let dp = io_uring_cqe_get_data(cqes[i])
             let bitPattern : UInt = UInt(bitPattern:dp)
 
-            let fd = Int(bitPattern & 0x00000000FFFFFFFF)
-            let eventType = Int(bitPattern >> 32) // shift out the fd
+//            let fd = Int(bitPattern & 0x00000000FFFFFFFF)
+//            let eventType = Int(bitPattern >> 32) // shift out the fd
 
+            let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
+            let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) && 0x00FFFFFF)
+            let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) && 0xFF000000) // shift out the fd
+
+            
             let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
 
-            _debugPrintCQE("\(i) = fd[\(fd)] eventType[\(String(describing:CqeEventType(rawValue:eventType)))] res [\(c.res)] flags [\(c.flags)]  bitpattern[\(String(describing:bitpatternAsPointer))]")
+            _debugPrintCQE("\(i) = fd[\(fd)] eventType[\(eventType)] sequenceNumber[\(sequenceNumber)] res [\(c.res)] flags [\(c.flags)]  bitpattern[\(String(describing:bitpatternAsPointer))]")
         }
     }
 
@@ -229,12 +235,13 @@ final internal class Uring {
         _debugPrint("io_uring_flush done")
     }
 
-    internal func io_uring_prep_poll_add(fd: Int32, pollMask: UInt32, submitNow: Bool = true, multishot: Bool = true) -> () {
+    internal func io_uring_prep_poll_add(fd: Int32, pollMask: UInt32, sequenceIdentifier: UInt32, submitNow: Bool = true, multishot: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
-        let bitPattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd)
+        let upperQuad : Int = CqeEventType.poll.rawValue << 24 + (sequenceIdentifier && 0x00FFFFFF)
+        let bitPattern : Int = upperQuad << 32 + Int(fd)
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
 
-        _debugPrint("io_uring_prep_poll_add fd[\(fd)] pollMask[\(pollMask)] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] submitNow[\(submitNow)] multishot[\(multishot)]")
+        _debugPrint("io_uring_prep_poll_add fd[\(fd)] pollMask[\(pollMask)] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] submitNow[\(submitNow)] multishot[\(multishot)] upperQuad [\(upperQuad)]")
 
         CNIOLinux.io_uring_prep_poll_add(sqe, fd, pollMask)
         CNIOLinux.io_uring_sqe_set_data(sqe, bitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
@@ -255,14 +262,18 @@ final internal class Uring {
         }
     }
     
-    internal func io_uring_prep_poll_remove(fd: Int32, pollMask: UInt32, submitNow: Bool = true) -> () {
+    internal func io_uring_prep_poll_remove(fd: Int32, pollMask: UInt32, sequenceIdentifier: UInt32, submitNow: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
-        let bitPattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd) // must be same as the poll for liburing to match
-        let userbitPattern : Int = CqeEventType.pollDelete.rawValue << 32 + Int(fd)
+        let upperQuad : Int = CqeEventType.poll.rawValue << 24 + (sequenceIdentifier && 0x00FFFFFF)
+        let bitPattern : Int = upperQuad << 32 + Int(fd)
+//        let bitPattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd) // must be same as the poll for liburing to match
+        let upperQuadDelete : Int = CqeEventType.pollDelete.rawValue << 24 + (sequenceIdentifier && 0x00FFFFFF)
+        let userbitPattern : Int = upperQuadDelete << 32 + Int(fd)
+//        let userbitPattern : Int = CqeEventType.pollDelete.rawValue << 32 + Int(fd)
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
         let userBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: userbitPattern)
 
-        _debugPrint("io_uring_prep_poll_remove fd[\(fd)] pollMask[\(pollMask)] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] userBitpatternAsPointer[\(String(describing:userBitpatternAsPointer))] submitNow[\(submitNow)]")
+        _debugPrint("io_uring_prep_poll_remove fd[\(fd)] pollMask[\(pollMask)] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] userBitpatternAsPointer[\(String(describing:userBitpatternAsPointer))] submitNow[\(submitNow)] upperQuad[\(upperQuad)] upperQuadDelete[\(upperQuadDelete)]")
 
         CNIOLinux.io_uring_prep_poll_remove(sqe, bitpatternAsPointer)
         CNIOLinux.io_uring_sqe_set_data(sqe, userBitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
@@ -272,14 +283,16 @@ final internal class Uring {
         }
     }
 
-    internal func io_uring_poll_update(fd: Int32, newPollmask: UInt32, oldPollmask: UInt32, submitNow: Bool = true, multishot : Bool = true) -> () {
+    internal func io_uring_poll_update(fd: Int32, newPollmask: UInt32, oldPollmask: UInt32, sequenceIdentifier: UInt32, submitNow: Bool = true, multishot : Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
-        let oldBitpattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd)
-        let newBitpattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd)
-        let userbitPattern : Int = CqeEventType.pollModify.rawValue << 32 + Int(fd)
+        let upperQuad : Int = CqeEventType.poll.rawValue << 24 + (sequenceIdentifier && 0x00FFFFFF)
+        let upperQuadModify : Int = CqeEventType.pollModify.rawValue << 24 + (sequenceIdentifier && 0x00FFFFFF)
+        let oldBitpattern : Int = upperQuad << 32 + Int(fd)
+        let newBitpattern : Int = upperQuad << 32 + Int(fd)
+        let userbitPattern : Int = upperQuadModify << 32 + Int(fd)
         let userBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: userbitPattern)
 
-        _debugPrint("io_uring_poll_update fd[\(fd)] oldPollmask[\(oldPollmask)] newPollmask[\(newPollmask)]  userBitpatternAsPointer[\(String(describing:userBitpatternAsPointer))]")
+        _debugPrint("io_uring_poll_update fd[\(fd)] oldPollmask[\(oldPollmask)] newPollmask[\(newPollmask)]  userBitpatternAsPointer[\(String(describing:userBitpatternAsPointer))] upperQuad[\(upperQuad)] upperQuadModify[\(upperQuadModify)]")
         
         // Documentation here:
         // https://git.kernel.dk/cgit/linux-block/commit/?h=poll-multiple&id=33021a19e324fb747c2038416753e63fd7cd9266
@@ -324,7 +337,8 @@ final internal class Uring {
         {
             let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[Int(i)]))
             let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
-            let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
+            let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) && 0x00FFFFFF)
+            let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) && 0xFF000000) // shift out the fd
             let result = cqes[Int(i)]!.pointee.res
 
             switch eventType {
@@ -344,6 +358,7 @@ final internal class Uring {
                             } else {
                                 events[eventCount].fd = fd
                                 events[eventCount].pollMask = pollError
+                                events[eventCount].sequenceNumber = sequenceNumber
                                 eventCount += 1
                             }
                             break
@@ -370,6 +385,7 @@ final internal class Uring {
                             } else {
                                 events[eventCount].fd = fd
                                 events[eventCount].pollMask = uresult
+                                events[eventCount].sequenceNumber = sequenceNumber
                                 eventCount += 1
                             }
                     }
@@ -391,6 +407,7 @@ final internal class Uring {
                             } else {
                                 events[eventCount].fd = fd
                                 events[eventCount].pollMask = pollError
+                                events[eventCount].sequenceNumber = sequenceNumber
                                 eventCount += 1
                             }
                             break
@@ -446,6 +463,7 @@ final internal class Uring {
 
                 events[eventCount].fd = fd
                 events[eventCount].pollMask = result_mask
+                events[eventCount].sequenceNumber = sequenceNumber
                 eventCount+=1
 
                 let socketClosing = (result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
@@ -478,7 +496,9 @@ final internal class Uring {
             dumpCqes("io_uring_wait_cqe")
             let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[0]))
             let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
-            let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
+            let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) && 0x00FFFFFF)
+            let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) && 0xFF000000) // shift out the fd
+//            let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
             let result = cqes[0]!.pointee.res
             
             switch eventType {
@@ -490,6 +510,7 @@ final internal class Uring {
                             let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             events[0].fd = fd
                             events[0].pollMask = pollError
+                            events[0].sequenceNumber = sequenceNumber
                             eventCount += 1
                             break
                         case -ENOENT:    // -ENOENT returned for failed poll remove
@@ -500,7 +521,7 @@ final internal class Uring {
                         case -EBADF:
                             break
                         case ..<0: // other errors
-                            _debugPrint("io_uring_wait_cqe non-positive result fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                            _debugPrint("io_uring_wait_cqe non-positive result fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))] sequenceNumber[\(sequenceNumber)]")
                             break
                         case 0: // successfull chained add, not an event
                             break
@@ -511,9 +532,10 @@ final internal class Uring {
                             
                             events[0].fd = fd
                             events[0].pollMask = uresult
+                            events[0].sequenceNumber = sequenceNumber
                             eventCount += 1
                             
-                            _debugPrint("io_uring_wait_cqe fd[\(fd)] events[0].pollMask [\(events[0].pollMask)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                            _debugPrint("io_uring_wait_cqe fd[\(fd)] events[0].pollMask [\(events[0].pollMask)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))] sequenceNumber[\(sequenceNumber)]")
                     }
                 case .pollModify?:
                     switch result {
@@ -525,6 +547,7 @@ final internal class Uring {
                             let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             events[0].fd = fd
                             events[0].pollMask = pollError
+                            events[0].sequenceNumber = sequenceNumber
                             eventCount += 1
 
                             break
@@ -585,7 +608,9 @@ final internal class Uring {
                 dumpCqes("io_uring_wait_cqe_timeout")
                 let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[0]))
                 let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
-                let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
+                let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) && 0x00FFFFFF)
+                let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) && 0xFF000000) // shift out the fd
+//                let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
                 let result = cqes[0]!.pointee.res
 
                 switch eventType {
@@ -597,6 +622,7 @@ final internal class Uring {
                                 let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                                 events[0].fd = fd
                                 events[0].pollMask = pollError
+                                events[0].sequenceNumber = sequenceNumber
                                 eventCount += 1
                                 break
                             case -ENOENT:    // -ENOENT returned for failed poll remove
@@ -618,6 +644,7 @@ final internal class Uring {
                                 
                                 events[0].fd = fd
                                 events[0].pollMask = uresult
+                                events[0].sequenceNumber = sequenceNumber
                                 eventCount += 1
                                 
                                 _debugPrint("io_uring_wait_cqe_timeout fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
@@ -632,6 +659,7 @@ final internal class Uring {
                                 let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                                 events[0].fd = fd
                                 events[0].pollMask = pollError
+                                events[0].sequenceNumber = sequenceNumber
                                 eventCount += 1
 
                                 break

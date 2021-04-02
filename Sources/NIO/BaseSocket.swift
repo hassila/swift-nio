@@ -250,6 +250,7 @@ extension sockaddr_storage {
 /// This should not be created directly but one of its sub-classes should be used, like `ServerSocket` or `Socket`.
 class BaseSocket: BaseSocketProtocol {
     typealias SelectableType = BaseSocket
+    var selectableSequenceIdentifier: UInt32 = 0
 
     private var descriptor: NIOBSDSocket.Handle
     public var isOpen: Bool {

@@ -18,6 +18,12 @@
 /// - warning:
 ///     `Selectable`s are not thread-safe, only to be used on the appropriate
 ///     `EventLoop`.
+///
+///     `selectableSequenceIdentifier` is used by some event notification backends (io_uring)
+///     to markup outbound events to allow for filtering of asynchronously received return values to not
+///     be delivered to a new Selectable instance that receives the same handle (fd). Ok if it wraps.
+///     Needed for i.e. testWeDoNotDeliverEventsForPreviouslyClosedChannels to succeed.
 protocol Selectable {
     func withUnsafeHandle<T>(_: (NIOBSDSocket.Handle) throws -> T) throws -> T
+    var selectableSequenceIdentifier: UInt32 { get set }
 }

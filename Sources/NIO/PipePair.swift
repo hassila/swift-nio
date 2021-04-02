@@ -14,6 +14,7 @@
 
 struct SelectableFileHandle {
     var handle: NIOFileHandle
+    var selectableSequenceIdentifier: UInt32 = 0
 
     var isOpen: Bool {
         return handle.isOpen
