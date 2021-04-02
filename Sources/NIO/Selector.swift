@@ -945,7 +945,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
 
     private static func allocateEventsArray(capacity: Int) -> UnsafeMutablePointer<EventType> {
         let events: UnsafeMutablePointer<EventType> = UnsafeMutablePointer.allocate(capacity: capacity)
-        events.initialize(to: EventType(fd:0, pollMask: 0, sequenceNumber:0))
+        events.initialize(to: EventType(fd:0, pollMask: 0, sequenceIdentifier:0))
         return events
     }
 
@@ -1149,8 +1149,8 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                                                   submitNow: false)
                     }
                     
-                    if event.sequenceNumber !=  registration.selectableSequenceIdentifier {
-                        _debugPrint("event.sequenceIdentifier [\(event.sequenceNumber)] !=  registration.selectableSequenceIdentifier [\(registration.selectableSequenceIdentifier)]")
+                    if event.sequenceIdentifier !=  registration.selectableSequenceIdentifier {
+                        _debugPrint("event.sequenceIdentifier [\(event.sequenceIdentifier)] !=  registration.selectableSequenceIdentifier [\(registration.selectableSequenceIdentifier)]")
                         continue
                     }
 
