@@ -230,6 +230,7 @@ extension Channel {
     }
 
     public func close(mode: CloseMode = .all, promise: EventLoopPromise<Void>?) {
+        print("channel.swift close pipepair ")
         pipeline.close(mode: mode, promise: promise)
     }
 

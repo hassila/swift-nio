@@ -1079,14 +1079,9 @@ final internal class UringSelector<R: Registration>: Selector<R> {
             }
         }
 
-        // start with no deregistrations happened
-        self.deregistrationsHappened = false
-
-        for i in 0..<ready {
+        for i in 0..<ready { // we don't use deregistrationsHappened, we use the sequenceIdentifier instead.
             let event = events[i]
-//            if self.deregistrationsHappened && event.fd != self.eventFD {
-//                continue
-//            }
+
             switch event.fd {
             case self.eventFD:
                     _debugPrint("wakeup successful for event.fd [\(event.fd)]")
@@ -1156,7 +1151,6 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                     
                     _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask))")
 
-//                    _debugPrint("Y [\(NIOThread.current)] running body  [\(event.fd)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask)) [\(registration.interested)]")
                     try body((SelectorEvent(io: selectorEvent, registration: registration)))
                     
                } else { // remove any polling if we don't have a registration for it
@@ -1169,10 +1163,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                 }
             }
         }
-        if (self.deregistrationsHappened) {
-          _debugPrint("deregistrationsHappened")
-        }
-        
+
         deferredReregistrationsPending = false // none pending as we will flush here
         ring.io_uring_flush() // flush reregisteration of the polls if needed (nop in SQPOLL mode)
         growEventArrayIfNeeded(ready: ready)
@@ -1191,8 +1182,8 @@ final internal class UringSelector<R: Registration>: Selector<R> {
             // Therefore, we assert here that close will always succeed and if not, that's a NIO bug we need to know
             // about.
             
-            ring.io_uring_queue_exit() // FIXME: Double-check fd is closed here
-            self.selectorFD = -1 // closed by uring_queue_exit
+            ring.io_uring_queue_exit() // This closes the ring selector fd for us
+            self.selectorFD = -1
 
             try! Posix.close(descriptor: self.eventFD)
             self.eventFD = -1
