@@ -39,6 +39,9 @@ void CNIOLinux_i_do_nothing_just_working_around_a_darwin_toolchain_bug2(void) {}
 #include <errno.h>
 #include <ctype.h>
 #include <sys/utsname.h>
+#include <pthread.h>
+
+pthread_once_t uring_once_control = PTHREAD_ONCE_INIT;
 
 // local typedefs for readability of function pointers
 // these should exactly match the signatures in liburing.h
@@ -248,15 +251,39 @@ void CNIOLinux_io_uring_free_probe(struct io_uring_probe *probe)
     return liburing_functions.io_uring_free_probe(probe);
 }
 
+
 int CNIOLinux_io_uring_queue_init_params(unsigned entries, struct io_uring *ring,
     struct io_uring_params *p)
 {
     return liburing_functions.io_uring_queue_init_params(entries, ring, p);
 }
 
+static struct io_uring global_ring; // shared small ring to be able to reuse SQPOLL kernel thread
+
+void shared_uring_setup(void) // shared uring to be able to share SQPOLL instance
+{
+    if (liburing_functions.io_uring_queue_init(4, &global_ring, IORING_SETUP_SQPOLL) != 0)
+    {
+        fprintf(stderr, "Failed to setup shared io_uring\n");
+    }
+    return
+}
+
 int CNIOLinux_io_uring_queue_init(unsigned entries, struct io_uring *ring,
     unsigned flags)
 {
+    
+    pthread_once(&uring_once_control, shared_uring_setup);
+
+    if (flags & IOURING_SETUP_SQPOLL) // if setting up SQPOLL, use shared kernel thread
+    {
+        struct io_uring_params params;
+        memset(&params, 0, sizeof(params));
+        params.flags = flags | IORING_SETUP_ATTACH_WQ;
+        params.wq_fd = global_ring.ring_fd;
+        return CNIOLinux_io_uring_queue_init_params(entries, ring, params);
+    }
+    
     return liburing_functions.io_uring_queue_init( entries, ring, flags);
 }
 
