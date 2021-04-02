@@ -78,7 +78,7 @@ final internal class Uring {
     private let cqeMaxCount : UInt32 = 4096 // shouldn't be more than ringEntries, this is the max chunk of CQE we take.
         
     var cqes : UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>
-    var fdEvents = [Int32: UInt32]() // fd : event_poll_return
+    var fdEvents = [(Int32, UInt32): UInt32]() // fd, sequence_identifier : event_poll_return
     var emptyCqe = io_uring_cqe()
 
     internal static let initializedUring: Bool = {
@@ -352,10 +352,10 @@ final internal class Uring {
                             let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             if mergeCQE
                             {
-                                if let current = fdEvents[fd] {
-                                    fdEvents[fd] = current | pollError
+                                if let current = fdEvents[(fd, sequenceNumber)] {
+                                    fdEvents[(fd, sequenceNumber)] = current | pollError
                                 } else {
-                                    fdEvents[fd] = pollError
+                                    fdEvents[(fd, sequenceNumber)] = pollError
                                 }
                             } else {
                                 events[eventCount].fd = fd
@@ -379,10 +379,10 @@ final internal class Uring {
                             let uresult = UInt32(result)
                             
                             if mergeCQE {
-                                if let current = fdEvents[fd] {
-                                    fdEvents[fd] =  current | uresult
+                                if let current = fdEvents[(fd, sequenceNumber)] {
+                                    fdEvents[(fd, sequenceNumber)] =  current | uresult
                                 } else {
-                                    fdEvents[fd] = uresult
+                                    fdEvents[(fd, sequenceNumber)] = uresult
                                 }
                             } else {
                                 events[eventCount].fd = fd
@@ -401,10 +401,10 @@ final internal class Uring {
                             let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             if mergeCQE
                             {
-                                if let current = fdEvents[fd] {
-                                    fdEvents[fd] = current | pollError
+                                if let current = fdEvents[(fd, sequenceNumber)] {
+                                    fdEvents[(fd, sequenceNumber)] = current | pollError
                                 } else {
-                                    fdEvents[fd] = pollError
+                                    fdEvents[(fd, sequenceNumber)] = pollError
                                 }
                             } else {
                                 events[eventCount].fd = fd
@@ -459,7 +459,7 @@ final internal class Uring {
         //  if running with merging, just return single event per fd,
         if mergeCQE {
             eventCount = 0
-            for (fd, result_mask) in fdEvents {
+            for ((fd, sequenceNumber), result_mask) in fdEvents {
                 assert(eventCount < maxevents)
                 assert(fd >= 0)
 
