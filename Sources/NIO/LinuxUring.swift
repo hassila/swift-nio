@@ -66,7 +66,7 @@ internal struct UringEvent {
 // info: udp_1_reqs_1000_conn: total number of mallocs: 338095
 
 struct fdEventKey: Hashable {
-    var fd : Int32
+    var fileDescriptor : Int32
     var sequenceIdentifier : UInt32
     
     init(_ f: Int32, _ s : UInt32) {
@@ -473,7 +473,7 @@ final internal class Uring {
                 assert(eventCount < maxevents)
                 assert(fd >= 0)
 
-                events[eventCount].fd = eventKey.fd
+                events[eventCount].fd = eventKey.fileDescriptor
                 events[eventCount].pollMask = result_mask
                 events[eventCount].sequenceIdentifier = eventKey.sequenceNumber
                 eventCount+=1
