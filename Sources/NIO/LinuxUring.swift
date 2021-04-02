@@ -65,6 +65,11 @@ internal struct UringEvent {
 // info: udp_1000_reqs_1_conn: total number of mallocs: 46285
 // info: udp_1_reqs_1000_conn: total number of mallocs: 338095
 
+struct fdEventKey: Hashable {
+    var fd : Int32
+    var sequenceIdentifier : UInt32
+}
+
 final internal class Uring {
     internal static let POLLIN: CUnsignedInt = numericCast(CNIOLinux.POLLIN)
     internal static let POLLOUT: CUnsignedInt = numericCast(CNIOLinux.POLLOUT)
@@ -78,7 +83,7 @@ final internal class Uring {
     private let cqeMaxCount : UInt32 = 4096 // shouldn't be more than ringEntries, this is the max chunk of CQE we take.
         
     var cqes : UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>
-    var fdEvents = [(Int32, UInt32): UInt32]() // fd, sequence_identifier : event_poll_return
+    var fdEvents = [fdEventKey : UInt32]() // fd, sequence_identifier : event_poll_return
     var emptyCqe = io_uring_cqe()
 
     internal static let initializedUring: Bool = {
@@ -352,10 +357,10 @@ final internal class Uring {
                             let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             if mergeCQE
                             {
-                                if let current = fdEvents[(fd, sequenceNumber)] {
-                                    fdEvents[(fd, sequenceNumber)] = current | pollError
+                                if let current = fdEvents[fdEventKey(fd, sequenceNumber)] {
+                                    fdEvents[fdEventKey(fd, sequenceNumber)] = current | pollError
                                 } else {
-                                    fdEvents[(fd, sequenceNumber)] = pollError
+                                    fdEvents[fdEventKey(fd, sequenceNumber)] = pollError
                                 }
                             } else {
                                 events[eventCount].fd = fd
@@ -379,10 +384,10 @@ final internal class Uring {
                             let uresult = UInt32(result)
                             
                             if mergeCQE {
-                                if let current = fdEvents[(fd, sequenceNumber)] {
-                                    fdEvents[(fd, sequenceNumber)] =  current | uresult
+                                if let current = fdEvents[fdEventKey(fd, sequenceNumber)] {
+                                    fdEvents[fdEventKey(fd, sequenceNumber)] =  current | uresult
                                 } else {
-                                    fdEvents[(fd, sequenceNumber)] = uresult
+                                    fdEvents[fdEventKey(fd, sequenceNumber)] = uresult
                                 }
                             } else {
                                 events[eventCount].fd = fd
@@ -401,10 +406,10 @@ final internal class Uring {
                             let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             if mergeCQE
                             {
-                                if let current = fdEvents[(fd, sequenceNumber)] {
-                                    fdEvents[(fd, sequenceNumber)] = current | pollError
+                                if let current = fdEvents[fdEventKey(fd, sequenceNumber)] {
+                                    fdEvents[fdEventKey(fd, sequenceNumber)] = current | pollError
                                 } else {
-                                    fdEvents[(fd, sequenceNumber)] = pollError
+                                    fdEvents[fdEventKey(fd, sequenceNumber)] = pollError
                                 }
                             } else {
                                 events[eventCount].fd = fd
@@ -459,13 +464,13 @@ final internal class Uring {
         //  if running with merging, just return single event per fd,
         if mergeCQE {
             eventCount = 0
-            for ((fd, sequenceNumber), result_mask) in fdEvents {
+            for (eventKey, result_mask) in fdEvents {
                 assert(eventCount < maxevents)
                 assert(fd >= 0)
 
-                events[eventCount].fd = fd
+                events[eventCount].fd = eventKey.fd
                 events[eventCount].pollMask = result_mask
-                events[eventCount].sequenceIdentifier = sequenceNumber
+                events[eventCount].sequenceIdentifier = eventKey.sequenceNumber
                 eventCount+=1
 
                 let socketClosing = (result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
