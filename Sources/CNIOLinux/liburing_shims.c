@@ -40,6 +40,7 @@ void CNIOLinux_i_do_nothing_just_working_around_a_darwin_toolchain_bug2(void) {}
 #include <ctype.h>
 #include <sys/utsname.h>
 #include <pthread.h>
+#include <string.h>
 
 pthread_once_t uring_once_control = PTHREAD_ONCE_INIT;
 
@@ -281,7 +282,7 @@ int CNIOLinux_io_uring_queue_init(unsigned entries, struct io_uring *ring,
         memset(&params, 0, sizeof(params));
         params.flags = flags | IORING_SETUP_ATTACH_WQ;
         params.wq_fd = global_ring.ring_fd;
-        return CNIOLinux_io_uring_queue_init_params(entries, ring, params);
+        return CNIOLinux_io_uring_queue_init_params(entries, ring, &params);
     }
     
     return liburing_functions.io_uring_queue_init( entries, ring, flags);
