@@ -267,7 +267,7 @@ void shared_uring_setup(void) // shared uring to be able to share SQPOLL instanc
     {
         fprintf(stderr, "Failed to setup shared io_uring\n");
     }
-    return
+    return;
 }
 
 int CNIOLinux_io_uring_queue_init(unsigned entries, struct io_uring *ring,
