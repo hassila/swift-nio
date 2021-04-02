@@ -407,7 +407,7 @@ internal class Selector<R: Registration> {
             try self._register(selectable : selectable, fd: Int(fd), interested: interested)
 
             registrations[Int(fd)] = makeRegistration(interested)
-            registrations[Int(fd)]?.selectableSequenceIdentifier = currentSelectableSequenceIdentifier
+            registrations[Int(fd)]?.setSelectableSequenceIdentifier(currentSelectableSequenceIdentifier)
         }
     }
 
@@ -999,7 +999,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
 
     override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet) throws {
         _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
-        selectable.selectableSequenceIdentifier = currentSelectableSequenceIdentifier
+        selectable.setSelectableSequenceIdentifier(currentSelectableSequenceIdentifier)
         ring.io_uring_prep_poll_add(fd: Int32(fd),
                                     pollMask: interested.uringEventSet,
                                     sequenceIdentifier: selectable.selectableSequenceIdentifier,
