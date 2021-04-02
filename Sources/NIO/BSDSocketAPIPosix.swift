@@ -25,15 +25,22 @@ extension Shutdown {
         }
     }
 }
-struct NIOBSDSDebugPrint {
-    internal static let _debugPrintEnabled: Bool = {
-        getEnvironmentVar("NIO_SOCKET") != nil
+
+internal struct NIOBSDSDebugPrint {
+    static func getEnvironmentVar(_ name: String) -> String? {
+        guard let rawValue = getenv(name) else { return nil }
+        return String(cString: rawValue)
+    }
+
+    static let _debugPrintEnabled: Bool = {
+        NIOBSDSDebugPrint.getEnvironmentVar("NIO_SOCKET") != nil
     }()
     
     static func _debugPrint(_ s : @autoclosure () -> String)
     {
         if NIOBSDSDebugPrint._debugPrintEnabled {
-            print("X [\(NIOThread.current)] " + s())
+//            print("X [\(NIOThread.current)] " + s())
+            print("X ----> " + s())
         }
     }
 }
