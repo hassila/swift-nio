@@ -46,7 +46,7 @@ internal extension TimeAmount {
 internal struct UringEvent {
     var fd : Int32
     var pollMask : UInt32
-    var sequenceNumber : UInt32
+    var sequenceIdentifier : UInt32
 }
 
 // FIXME: Current significant malloc regressions vs epoll:
@@ -358,7 +358,7 @@ final internal class Uring {
                             } else {
                                 events[eventCount].fd = fd
                                 events[eventCount].pollMask = pollError
-                                events[eventCount].sequenceNumber = sequenceNumber
+                                events[eventCount].sequenceIdentifier = sequenceNumber
                                 eventCount += 1
                             }
                             break
@@ -385,7 +385,7 @@ final internal class Uring {
                             } else {
                                 events[eventCount].fd = fd
                                 events[eventCount].pollMask = uresult
-                                events[eventCount].sequenceNumber = sequenceNumber
+                                events[eventCount].sequenceIdentifier = sequenceNumber
                                 eventCount += 1
                             }
                     }
@@ -407,7 +407,7 @@ final internal class Uring {
                             } else {
                                 events[eventCount].fd = fd
                                 events[eventCount].pollMask = pollError
-                                events[eventCount].sequenceNumber = sequenceNumber
+                                events[eventCount].sequenceIdentifier = sequenceNumber
                                 eventCount += 1
                             }
                             break
@@ -463,7 +463,7 @@ final internal class Uring {
 
                 events[eventCount].fd = fd
                 events[eventCount].pollMask = result_mask
-                events[eventCount].sequenceNumber = sequenceNumber
+                events[eventCount].sequenceIdentifier = sequenceNumber
                 eventCount+=1
 
                 let socketClosing = (result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
@@ -510,7 +510,7 @@ final internal class Uring {
                             let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             events[0].fd = fd
                             events[0].pollMask = pollError
-                            events[0].sequenceNumber = sequenceNumber
+                            events[0].sequenceIdentifier = sequenceNumber
                             eventCount += 1
                             break
                         case -ENOENT:    // -ENOENT returned for failed poll remove
@@ -532,7 +532,7 @@ final internal class Uring {
                             
                             events[0].fd = fd
                             events[0].pollMask = uresult
-                            events[0].sequenceNumber = sequenceNumber
+                            events[0].sequenceIdentifier = sequenceNumber
                             eventCount += 1
                             
                             _debugPrint("io_uring_wait_cqe fd[\(fd)] events[0].pollMask [\(events[0].pollMask)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))] sequenceNumber[\(sequenceNumber)]")
@@ -547,7 +547,7 @@ final internal class Uring {
                             let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             events[0].fd = fd
                             events[0].pollMask = pollError
-                            events[0].sequenceNumber = sequenceNumber
+                            events[0].sequenceIdentifier = sequenceNumber
                             eventCount += 1
 
                             break
@@ -622,7 +622,7 @@ final internal class Uring {
                                 let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                                 events[0].fd = fd
                                 events[0].pollMask = pollError
-                                events[0].sequenceNumber = sequenceNumber
+                                events[0].sequenceIdentifier = sequenceNumber
                                 eventCount += 1
                                 break
                             case -ENOENT:    // -ENOENT returned for failed poll remove
@@ -644,7 +644,7 @@ final internal class Uring {
                                 
                                 events[0].fd = fd
                                 events[0].pollMask = uresult
-                                events[0].sequenceNumber = sequenceNumber
+                                events[0].sequenceIdentifier = sequenceNumber
                                 eventCount += 1
                                 
                                 _debugPrint("io_uring_wait_cqe_timeout fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
@@ -659,7 +659,7 @@ final internal class Uring {
                                 let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                                 events[0].fd = fd
                                 events[0].pollMask = pollError
-                                events[0].sequenceNumber = sequenceNumber
+                                events[0].sequenceIdentifier = sequenceNumber
                                 eventCount += 1
 
                                 break
