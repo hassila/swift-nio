@@ -471,7 +471,7 @@ final internal class Uring {
             eventCount = 0
             for (eventKey, result_mask) in fdEvents {
                 assert(eventCount < maxevents)
-                assert(fd >= 0)
+                assert(eventKey.fileDescriptor >= 0)
 
                 events[eventCount].fd = eventKey.fileDescriptor
                 events[eventCount].pollMask = result_mask
@@ -481,7 +481,7 @@ final internal class Uring {
                 let socketClosing = (result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
 
                 if (socketClosing == true) {
-                    _debugPrint("socket is going down [\(fd)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
+                    _debugPrint("socket is going down [\(eventKey.fileDescriptor)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
                 }
             }
             if eventCount > 0 {
