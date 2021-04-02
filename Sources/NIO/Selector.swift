@@ -348,7 +348,7 @@ internal class Selector<R: Registration> {
     // writes: `self.externalSelectorFDLock` AND access from the EventLoop thread
     fileprivate var selectorFD: CInt = -1 // -1 == we're closed
     fileprivate let myThread: NIOThread
-    fileprivate var currentSelectableSequenceIdentifier : UInt32 = 0
+    private var currentSelectableSequenceIdentifier : UInt32 = 0
 
     internal func testsOnly_withUnsafeSelectorFD<T>(_ body: (CInt) throws -> T) throws -> T {
         assert(self.myThread != NIOThread.current)
@@ -376,15 +376,15 @@ internal class Selector<R: Registration> {
     }
   
     // hooks for platform specific registration activity (ie. kqueue, epoll, uring)
-    func _register<S: Selectable>(selectable: S, fd: Int, interested: SelectorEventSet) throws {
+    func _register<S: Selectable>(selectable: S, fd: Int, interested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
         fatalError("must override")
     }
     
-    func _reregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet) throws {
+    func _reregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet , sequenceIdentifier : UInt32 = 0) throws {
         fatalError("must override")
     }
     
-    func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet) throws {
+    func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
         fatalError("must override")
     }
     
@@ -403,13 +403,10 @@ internal class Selector<R: Registration> {
 
         try selectable.withUnsafeHandle { fd in
             assert(registrations[Int(fd)] == nil)
-            currentSelectableSequenceIdentifier &+= 1 // we are ok to overflow
-            try self._register(selectable : selectable, fd: Int(fd), interested: interested)
-
+            try self._register(selectable : selectable, fd: Int(fd), interested: interested, sequenceIdentifier: currentSelectableSequenceIdentifier)
             registrations[Int(fd)] = makeRegistration(interested)
             registrations[Int(fd)]?.selectableSequenceIdentifier = currentSelectableSequenceIdentifier
-            
-//            registrations[Int(fd)]?.setSelectableSequenceIdentifier(identifier: currentSelectableSequenceIdentifier)
+            currentSelectableSequenceIdentifier &+= 1 // we are ok to overflow
         }
     }
 
@@ -426,7 +423,7 @@ internal class Selector<R: Registration> {
         assert(interested.contains(.reset), "must register for at least .reset but tried registering for \(interested)")
         try selectable.withUnsafeHandle { fd in
             var reg = registrations[Int(fd)]!
-            try self._reregister(selectable : selectable, fd: Int(fd), oldInterested: reg.interested, newInterested: interested)
+            try self._reregister(selectable : selectable, fd: Int(fd), oldInterested: reg.interested, newInterested: interested, sequenceIdentifier: reg.selectableSequenceIdentifier)
             reg.interested = interested
             registrations[Int(fd)] = reg
         }
@@ -449,7 +446,7 @@ internal class Selector<R: Registration> {
             guard let reg = registrations.removeValue(forKey: Int(fd)) else {
                 return
             }
-            try self._deregister(selectable: selectable, fd: Int(fd), oldInterested: reg.interested)
+            try self._deregister(selectable: selectable, fd: Int(fd), oldInterested: reg.interested, sequenceIdentifier: reg.selectableSequenceIdentifier)
         }
     }
 
@@ -601,15 +598,15 @@ final internal class KqueueSelector<R: Registration>: Selector<R> {
         }
     }
     
-    override func _register<S: Selectable>(selectable: S, fd: Int, interested: SelectorEventSet) throws {
+    override func _register<S: Selectable>(selectable: S, fd: Int, interested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
         try kqueueUpdateEventNotifications(selectable: selectable, interested: interested, oldInterested: nil)
     }
 
-    override func _reregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet) throws {
+    override func _reregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
         try kqueueUpdateEventNotifications(selectable: selectable, interested: newInterested, oldInterested: oldInterested)
     }
     
-    override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet) throws {
+    override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
         try kqueueUpdateEventNotifications(selectable: selectable, interested: .reset, oldInterested: oldInterested)
     }
 
@@ -786,7 +783,7 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
         assert(self.timerFD == -1, "self.timerFD == \(self.timerFD) on EpollSelector deinit, forgot close?")
     }
 
-    override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet) throws {
+    override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
         var ev = Epoll.epoll_event()
         ev.events = interested.epollEventSet
         ev.data.fd = Int32(fd)
@@ -794,7 +791,7 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
         try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_ADD, fd: ev.data.fd, event: &ev)
     }
 
-    override func _reregister<S: Selectable>(selectable : S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet) throws {
+    override func _reregister<S: Selectable>(selectable : S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
         var ev = Epoll.epoll_event()
         ev.events = newInterested.epollEventSet
         ev.data.fd = Int32(fd)
@@ -802,7 +799,7 @@ final internal class EpollSelector<R: Registration>: Selector<R> {
         _ = try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_MOD, fd: ev.data.fd, event: &ev)
     }
 
-    override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet) throws {
+    override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
         var ev = Epoll.epoll_event()
         _ = try Epoll.epoll_ctl(epfd: self.selectorFD, op: Epoll.EPOLL_CTL_DEL, fd: Int32(fd), event: &ev)
     }
@@ -999,35 +996,34 @@ final internal class UringSelector<R: Registration>: Selector<R> {
         assert(self.eventFD == -1, "self.eventFD == \(self.eventFD) on UringSelector deinit, forgot close?")
     }
 
-    override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet) throws {
-        _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
-        selectable.setSelectableSequenceIdentifier(identifier:currentSelectableSequenceIdentifier)
+    override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
+        _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)] sequenceIdentifier[\(sequenceIdentifier)]")
         ring.io_uring_prep_poll_add(fd: Int32(fd),
                                     pollMask: interested.uringEventSet,
-                                    sequenceIdentifier: selectable.selectableSequenceIdentifier,
+                                    sequenceIdentifier: sequenceIdentifier,
                                     submitNow: !deferReregistrations,
                                     multishot: multishot)
     }
 
-    override func _reregister<S: Selectable>(selectable : S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet) throws {
+    override func _reregister<S: Selectable>(selectable : S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
         _debugPrint("Re-register old \(oldInterested) new \(newInterested) uringEventSet [\(oldInterested.uringEventSet)] reg.uringEventSet [\(newInterested.uringEventSet)]")
 
         deferredReregistrationsPending = true
         ring.io_uring_poll_update(fd: Int32(fd),
                                   newPollmask: newInterested.uringEventSet,
                                   oldPollmask: oldInterested.uringEventSet,
-                                  sequenceIdentifier: selectable.selectableSequenceIdentifier,
+                                  sequenceIdentifier: sequenceIdentifier,
                                   submitNow: !deferReregistrations,
                                   multishot:multishot)
     }
 
-    override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet) throws {
+    override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
         _debugPrint("deregister interested \(selectable) reg.interested.uringEventSet [\(oldInterested.uringEventSet)]")
 
         deferredReregistrationsPending = true
         ring.io_uring_prep_poll_remove(fd: Int32(fd),
                                        pollMask: oldInterested.uringEventSet,
-                                       sequenceIdentifier: selectable.selectableSequenceIdentifier,
+                                       sequenceIdentifier: sequenceIdentifier,
                                        submitNow:!deferReregistrations)
     }
     

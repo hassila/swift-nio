@@ -14,7 +14,6 @@
 
 struct SelectableFileHandle {
     var handle: NIOFileHandle
-    var selectableSequenceIdentifier: UInt32 = 0
 
     var isOpen: Bool {
         return handle.isOpen
@@ -32,9 +31,6 @@ struct SelectableFileHandle {
 extension SelectableFileHandle: Selectable {
     func withUnsafeHandle<T>(_ body: (CInt) throws -> T) throws -> T {
         return try self.handle.withUnsafeFileDescriptor(body)
-    }
-    mutating func setSelectableSequenceIdentifier(identifier: UInt32) {
-        selectableSequenceIdentifier = identifier
     }
 }
 

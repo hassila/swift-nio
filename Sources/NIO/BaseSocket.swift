@@ -256,7 +256,6 @@ extension sockaddr_storage {
 /// This should not be created directly but one of its sub-classes should be used, like `ServerSocket` or `Socket`.
 class BaseSocket: BaseSocketProtocol {
     typealias SelectableType = BaseSocket
-    var selectableSequenceIdentifier: UInt32 = 0
 
     private var descriptor: NIOBSDSocket.Handle
     public var isOpen: Bool {
@@ -508,9 +507,6 @@ extension BaseSocket: Selectable {
             throw IOError(errnoCode: EBADF, reason: "file descriptor already closed!")
         }
         return try body(self.descriptor)
-    }
-    func setSelectableSequenceIdentifier(identifier: UInt32) {
-        selectableSequenceIdentifier = identifier
     }
 }
 
