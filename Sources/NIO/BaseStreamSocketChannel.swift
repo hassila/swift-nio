@@ -168,6 +168,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                     promise?.fail(ChannelError.outputClosed)
                     return
                 }
+                print("final self.socket.shutdown")
                 try self.socket.shutdown(how: .WR)
                 self.outputShutdown = true
                 // Fail all pending writes and so ensure all pending promises are notified
