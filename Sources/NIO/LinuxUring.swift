@@ -70,7 +70,7 @@ struct fdEventKey: Hashable {
     var sequenceIdentifier : UInt32
     
     init(_ f: Int32, _ s : UInt32) {
-        self.fd = f
+        self.fileDescriptor = f
         self.sequenceIdentifier = s
     }
 }
@@ -475,7 +475,7 @@ final internal class Uring {
 
                 events[eventCount].fd = eventKey.fileDescriptor
                 events[eventCount].pollMask = result_mask
-                events[eventCount].sequenceIdentifier = eventKey.sequenceNumber
+                events[eventCount].sequenceIdentifier = eventKey.sequenceIdentifier
                 eventCount+=1
 
                 let socketClosing = (result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
