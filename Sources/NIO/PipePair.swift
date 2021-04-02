@@ -33,6 +33,9 @@ extension SelectableFileHandle: Selectable {
     func withUnsafeHandle<T>(_ body: (CInt) throws -> T) throws -> T {
         return try self.handle.withUnsafeFileDescriptor(body)
     }
+    mutating func setSelectableSequenceIdentifier(identifier: UInt32) {
+        selectableSequenceIdentifier = identifier
+    }
 }
 
 final class PipePair: SocketProtocol {

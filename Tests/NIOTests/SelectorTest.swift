@@ -30,6 +30,7 @@ class SelectorTest: XCTestCase {
         struct TestRegistration: Registration {
             var interested: SelectorEventSet
             let socket: Socket
+            var selectableSequenceIdentifier: UInt32 = 0
         }
 
         let selector : NIO.Selector<TestRegistration> = try MultiThreadedEventLoopGroup.defaultSelectorFactory()

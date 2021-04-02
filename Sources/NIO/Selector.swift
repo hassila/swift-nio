@@ -403,8 +403,11 @@ internal class Selector<R: Registration> {
 
         try selectable.withUnsafeHandle { fd in
             assert(registrations[Int(fd)] == nil)
+            currentSelectableSequenceIdentifier &+= 1 // we are ok to overflow
             try self._register(selectable : selectable, fd: Int(fd), interested: interested)
+
             registrations[Int(fd)] = makeRegistration(interested)
+            registrations[Int(fd)]?.selectableSequenceIdentifier = currentSelectableSequenceIdentifier
         }
     }
 
@@ -943,7 +946,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
 
     private static func allocateEventsArray(capacity: Int) -> UnsafeMutablePointer<EventType> {
         let events: UnsafeMutablePointer<EventType> = UnsafeMutablePointer.allocate(capacity: capacity)
-        events.initialize(to: EventType(fd:0, pollMask: 0))
+        events.initialize(to: EventType(fd:0, pollMask: 0, sequenceIdentifier:0))
         return events
     }
 
@@ -982,7 +985,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
         self.selectorFD = ring.fd()
         self.eventFD = try EventFd.eventfd(initval: 0, flags: Int32(EventFd.EFD_CLOEXEC | EventFd.EFD_NONBLOCK))
 
-        ring.io_uring_prep_poll_add(fd: Int32(self.eventFD), pollMask: Uring.POLLIN, multishot:false) // wakeups
+        ring.io_uring_prep_poll_add(fd: Int32(self.eventFD), pollMask: Uring.POLLIN, sequenceIdentifier:0, multishot:false) // wakeups
 
         self.lifecycleState = .open
         _debugPrint("UringSelector up and running fd [\(self.selectorFD)]")
@@ -996,23 +999,34 @@ final internal class UringSelector<R: Registration>: Selector<R> {
 
     override func _register<S: Selectable>(selectable : S, fd: Int, interested: SelectorEventSet) throws {
         _debugPrint("register interested \(interested) uringEventSet [\(interested.uringEventSet)]")
-        currentSelectableSequenceIdentifier &+ 1 // we are ok to overflow
         selectable.selectableSequenceIdentifier = currentSelectableSequenceIdentifier
-        ring.io_uring_prep_poll_add(fd: Int32(fd), pollMask: interested.uringEventSet, submitNow:!deferReregistrations, multishot:multishot)
+        ring.io_uring_prep_poll_add(fd: Int32(fd),
+                                    pollMask: interested.uringEventSet,
+                                    sequenceIdentifier: selectable.selectableSequenceIdentifier,
+                                    submitNow: !deferReregistrations,
+                                    multishot: multishot)
     }
 
     override func _reregister<S: Selectable>(selectable : S, fd: Int, oldInterested: SelectorEventSet, newInterested: SelectorEventSet) throws {
         _debugPrint("Re-register old \(oldInterested) new \(newInterested) uringEventSet [\(oldInterested.uringEventSet)] reg.uringEventSet [\(newInterested.uringEventSet)]")
 
         deferredReregistrationsPending = true
-        ring.io_uring_poll_update(fd: Int32(fd), newPollmask: newInterested.uringEventSet, oldPollmask:oldInterested.uringEventSet, submitNow:!deferReregistrations, multishot:multishot)
+        ring.io_uring_poll_update(fd: Int32(fd),
+                                  newPollmask: newInterested.uringEventSet,
+                                  oldPollmask: oldInterested.uringEventSet,
+                                  sequenceIdentifier: selectable.selectableSequenceIdentifier,
+                                  submitNow: !deferReregistrations,
+                                  multishot:multishot)
     }
 
     override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet) throws {
         _debugPrint("deregister interested \(selectable) reg.interested.uringEventSet [\(oldInterested.uringEventSet)]")
 
         deferredReregistrationsPending = true
-        ring.io_uring_prep_poll_remove(fd: Int32(fd), pollMask: oldInterested.uringEventSet, submitNow:!deferReregistrations)
+        ring.io_uring_prep_poll_remove(fd: Int32(fd),
+                                       pollMask: oldInterested.uringEventSet,
+                                       sequenceIdentifier: selectable.selectableSequenceIdentifier,
+                                       submitNow:!deferReregistrations)
     }
     
     private func shouldRefreshPollForEvent(selectorEvent:SelectorEventSet) -> Bool {
@@ -1078,7 +1092,11 @@ final internal class UringSelector<R: Registration>: Selector<R> {
             case self.eventFD:
                     _debugPrint("wakeup successful for event.fd [\(event.fd)]")
                     var val = EventFd.eventfd_t()
-                    ring.io_uring_prep_poll_add(fd: Int32(self.eventFD), pollMask: Uring.POLLIN, submitNow: false, multishot:false)
+                    ring.io_uring_prep_poll_add(fd: Int32(self.eventFD),
+                                                pollMask: Uring.POLLIN,
+                                                sequenceIdentifier: 0,
+                                                submitNow: false,
+                                                multishot:false)
                     do {
                         _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
                         _debugPrint("read val [\(val)] from event.fd [\(event.fd)]")
@@ -1109,7 +1127,11 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                     }
                     // FIXME: No reregistrations for reset events, but we can see clients do reregistrations...
                     if multishot == false && shouldRefreshPollForEvent(selectorEvent:selectorEvent) { // must be before guard, otherwise lost wake
-                        ring.io_uring_prep_poll_add(fd: event.fd, pollMask: registration.interested.uringEventSet, submitNow:false, multishot:false)
+                        ring.io_uring_prep_poll_add(fd: event.fd,
+                                                    pollMask: registration.interested.uringEventSet,
+                                                    sequenceIdentifier: registration.selectableSequenceIdentifier,
+                                                    submitNow:false,
+                                                    multishot:false)
                     }
 
                     guard selectorEvent != ._none else {
@@ -1117,26 +1139,35 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                         continue
                     }
 
-                    _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask))")
 
                     // FIXME: This is only needed due to the edge triggered nature of liburing, possibly
                     // we can get away with only updating (force triggering an event if available) for
                     // partial reads (where we currently give up after 4 iterations)
                     if multishot && shouldRefreshPollForEvent(selectorEvent:selectorEvent) { // can be after guard as it is multishot
-                        ring.io_uring_poll_update(fd: event.fd, newPollmask: registration.interested.uringEventSet, oldPollmask:registration.interested.uringEventSet, submitNow:false)
+                        ring.io_uring_poll_update(fd: event.fd,
+                                                  newPollmask: registration.interested.uringEventSet,
+                                                  oldPollmask: registration.interested.uringEventSet,
+                                                  sequenceIdentifier: registration.selectableSequenceIdentifier,
+                                                  submitNow: false)
                     }
                     
-                    if deregistrationsHappened {
+                    if event.sequenceIdentifier !=  registration.selectableSequenceIdentifier {
+                        _debugPrint("event.sequenceIdentifier [\(event.sequenceIdentifier)] !=  registration.selectableSequenceIdentifier [\(registration.selectableSequenceIdentifier)]")
                         continue
                     }
+
+                    _debugPrint("running body [\(NIOThread.current)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask))")
 
 //                    _debugPrint("Y [\(NIOThread.current)] running body  [\(event.fd)] \(selectorEvent) \(SelectorEventSet(uringEvent: event.pollMask)) [\(registration.interested)]")
                     try body((SelectorEvent(io: selectorEvent, registration: registration)))
                     
                } else { // remove any polling if we don't have a registration for it
-                    _debugPrint("We had no registration for event.fd [\(event.fd)] event.pollMask [\(event.pollMask)] - should be deregistered already deregistrationsHappened[\(deregistrationsHappened)]")
+                    _debugPrint("We had no registration for event.fd [\(event.fd)] event.pollMask [\(event.pollMask)] event.sequenceIdentifier [\(event.sequenceIdentifier)]- should be deregistered already deregistrationsHappened[\(deregistrationsHappened)]")
 
-                    ring.io_uring_prep_poll_remove(fd: event.fd, pollMask: event.pollMask, submitNow:false)
+                    ring.io_uring_prep_poll_remove(fd: event.fd,
+                                                   pollMask: event.pollMask,
+                                                   sequenceIdentifier: event.sequenceIdentifier,
+                                                   submitNow: false)
                 }
             }
         }
@@ -1237,13 +1268,13 @@ extension Selector where R == NIORegistration {
             }
 
             switch reg {
-            case .serverSocketChannel(let chan, _):
+            case .serverSocketChannel(let chan, _, _):
                 return closeChannel(chan)
-            case .socketChannel(let chan, _):
+            case .socketChannel(let chan, _, _):
                 return closeChannel(chan)
-            case .datagramChannel(let chan, _):
+            case .datagramChannel(let chan, _, _):
                 return closeChannel(chan)
-            case .pipeChannel(let chan, _, _):
+            case .pipeChannel(let chan, _, _, _):
                 return closeChannel(chan)
             }
         }.map { future in

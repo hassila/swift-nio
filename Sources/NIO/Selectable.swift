@@ -25,5 +25,5 @@
 ///     Needed for i.e. testWeDoNotDeliverEventsForPreviouslyClosedChannels to succeed.
 protocol Selectable {
     func withUnsafeHandle<T>(_: (NIOBSDSocket.Handle) throws -> T) throws -> T
-    var selectableSequenceIdentifier: UInt32 { get set }
+    mutating func setSelectableSequenceIdentifier(identifier: UInt32)
 }
