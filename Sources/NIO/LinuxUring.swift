@@ -157,7 +157,7 @@ final internal class Uring {
         // and CNIOLinux_io_uring_queue_init will setup a shared uring instance which allows us to use a single
         // kernel sqpoll thread that is shared amongst all loops. NB, each process will have it's own polling thread
         // if SQPOLL is enabled, so for hosts running multiple processes using it, some care should be taken to not overload.
-        if (CNIOLinux.CNIOLinux_io_uring_queue_init(ringEntries, &ring, _sqpollEnabled ? IORING_SETUP_SQPOLL : 0 ) != 0)
+        if (CNIOLinux.CNIOLinux_io_uring_queue_init(ringEntries, &ring, Uring._sqpollEnabled ? IORING_SETUP_SQPOLL : 0 ) != 0)
          {
              throw UringError.uringSetupFailure
          }
