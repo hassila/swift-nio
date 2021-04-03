@@ -194,7 +194,7 @@ final internal class Uring {
         var submissionCount = 0
         var retval : Int32
         
-        _debugPrint("io_uring_flush")
+//        _debugPrint("io_uring_flush")
 
         waitingSubmissions = CNIOLinux_io_uring_sq_ready(&ring)
         
@@ -239,7 +239,7 @@ final internal class Uring {
             
             waitingSubmissions = CNIOLinux_io_uring_sq_ready(&ring)
         }
-        _debugPrint("io_uring_flush done")
+//        _debugPrint("io_uring_flush done")
     }
 
     internal func io_uring_prep_poll_add(fd: Int32, pollMask: UInt32, sequenceIdentifier: UInt32, submitNow: Bool = true, multishot: Bool = true) -> () {
