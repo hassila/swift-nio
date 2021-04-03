@@ -238,9 +238,7 @@ internal enum Posix {
 
     @inline(never)
     public static func close(descriptor: CInt) throws {
- //       let res = sysClose(descriptor)
-        let res = 0
-        try Posix.close(descriptor: descriptor)
+        let res = sysClose(descriptor)
 
 //        print("close(\(descriptor)) = (\(res))")
         if res == -1 {
