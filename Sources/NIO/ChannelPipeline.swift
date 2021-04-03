@@ -1173,7 +1173,7 @@ extension ChannelPipeline {
     }
 
     func close(context: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {
-        print("channelpipeline.swift close(context: ChannelHandlerContext ")
+//        print("channelpipeline.swift close")
         context.channel._channelCore.close0(error: mode.error, mode: mode, promise: promise)
     }
 
@@ -1662,7 +1662,7 @@ public final class ChannelHandlerContext: ChannelInvoker {
 
     fileprivate func invokeClose(mode: CloseMode, promise: EventLoopPromise<Void>?) {
         self.eventLoop.assertInEventLoop()
-        print("channelpipeline.swift invokeClose ")
+//        print("channelpipeline.swift invokeClose ")
 
         if let outboundHandler = self.outboundHandler {
             outboundHandler.close(context: self, mode: mode, promise: promise)
