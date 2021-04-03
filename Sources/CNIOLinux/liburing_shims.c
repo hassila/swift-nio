@@ -237,6 +237,39 @@ int CNIOLinux_io_uring_load()
 
 // And the wrappers, should never be called unless we've done CNIOLinux_io_uring_load once first.
 
+pthread_mutex_t global_ring_mutex = PTHREAD_MUTEX_INITIALIZER;
+static struct io_uring global_ring; // shared small ring to be able to reuse SQPOLL kernel thread
+
+// FIXME: We need to look at cpu affinity and preferably bind the SQPOLL thread to a specific core
+// and support cgroup / cpu sets on Linux to isolate it - then we should set IORING_SETUP_SQ_AFF here.
+
+int CNIOLinux_io_uring_queue_init(unsigned entries, struct io_uring *ring,
+    unsigned flags)
+{
+    if (flags & IORING_SETUP_SQPOLL)
+    {
+        pthread_mutex_lock(&global_ring_mutex);
+        if (!global_ring.ring_fd)
+        {
+            // setup a small global ring whose fd we can reference to use shared kernel sqpoll thread for all rings
+            // we don't particulariy care if we fail, then no SQPOLL shared ring
+            (void) liburing_functions.io_uring_queue_init(4, &global_ring, IORING_SETUP_SQPOLL); // should have IORING_SETUP_SQ_AFF
+        }
+        pthread_mutex_unlock(&global_ring_mutex);
+
+        if (global_ring.ring_fd) // use shared kernel thread if it exists, otherwise fallthrough to normal setup
+        {
+            struct io_uring_params params;
+            memset(&params, 0, sizeof(params));
+            params.flags = flags | IORING_SETUP_ATTACH_WQ;
+            params.wq_fd = global_ring.ring_fd;
+            return CNIOLinux_io_uring_queue_init_params(entries, ring, &params);
+        }
+    }
+    
+    return liburing_functions.io_uring_queue_init( entries, ring, flags);
+}
+
 struct io_uring_probe *CNIOLinux_io_uring_get_probe_ring(struct io_uring *ring)
 {
     return liburing_functions.io_uring_get_probe_ring(ring);
@@ -257,35 +290,6 @@ int CNIOLinux_io_uring_queue_init_params(unsigned entries, struct io_uring *ring
     struct io_uring_params *p)
 {
     return liburing_functions.io_uring_queue_init_params(entries, ring, p);
-}
-
-static struct io_uring global_ring; // shared small ring to be able to reuse SQPOLL kernel thread
-
-void shared_uring_setup(void) // shared uring to be able to share SQPOLL instance
-{
-    if (liburing_functions.io_uring_queue_init(4, &global_ring, IORING_SETUP_SQPOLL) != 0)
-    {
-        fprintf(stderr, "Failed to setup shared io_uring\n");
-    }
-    return;
-}
-
-int CNIOLinux_io_uring_queue_init(unsigned entries, struct io_uring *ring,
-    unsigned flags)
-{
-    
-    pthread_once(&uring_once_control, shared_uring_setup);
-
-    if (flags & IORING_SETUP_SQPOLL) // if setting up SQPOLL, use shared kernel thread
-    {
-        struct io_uring_params params;
-        memset(&params, 0, sizeof(params));
-        params.flags = flags | IORING_SETUP_ATTACH_WQ;
-        params.wq_fd = global_ring.ring_fd;
-        return CNIOLinux_io_uring_queue_init_params(entries, ring, &params);
-    }
-    
-    return liburing_functions.io_uring_queue_init( entries, ring, flags);
 }
 
 int CNIOLinux_io_uring_queue_mmap(int fd, struct io_uring_params *p,

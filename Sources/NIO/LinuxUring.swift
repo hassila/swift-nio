@@ -147,21 +147,17 @@ final internal class Uring {
     internal func fd() -> Int32 {
        return ring.ring_fd
     }
-
+    
+    static let _sqpollEnabled: Bool = {
+        NIOBSDSDebugPrint.getEnvironmentVar("IORING_SETUP_SQPOLL") != nil // set this env. var to enable SQPOLL
+    }()
+    
     internal func io_uring_queue_init() throws -> () {
-        // FIXME: IORING_SETUP_SQPOLL is currently basically useless in default configuraiton as it starts one kernel
-        // poller thread per ring. It is possible to regulate this by sharing a kernel thread for the polling
-        // with IORING_SETUP_ATTACH_WQ, but it requires the first ring to be setup with polling and then the
-        // fd shared with later rings. Not very convenient or easy to use really.
-        // A New setup option is in the works IORING_SETUP_SQPOLL_PERCPU which together with IORING_SETUP_SQ_AFF
-        // will be possible to use to bind the kernel poller thread to a given cpu (and share one amongst all rings)
-        // - not yet in the kernel and work in progress, but should be a better fit and worth trying.
-        // Alternatively we could look at limiting number of threads created to numcpu / 2 or so
-        // instead of starting one thread per core in the multithreaded event loop
-        // or allowing customization of whether to use SQPOLL somewhere higher up.
-        // Also, current IORING_SETUP_SQPOLL requires correct privileges to run (root or specific privs set)
-        // This limitation is lifted in 5.13.
-        if (CNIOLinux.CNIOLinux_io_uring_queue_init(ringEntries, &ring, IORING_SETUP_SQPOLL ) != 0) // IORING_SETUP_SQPOLL
+        // IORING_SETUP_SQPOLL will be fundamentally useful in 5.13, as we no longer need elevated privileges as previously
+        // and CNIOLinux_io_uring_queue_init will setup a shared uring instance which allows us to use a single
+        // kernel sqpoll thread that is shared amongst all loops. NB, each process will have it's own polling thread
+        // if SQPOLL is enabled, so for hosts running multiple processes using it, some care should be taken to not overload.
+        if (CNIOLinux.CNIOLinux_io_uring_queue_init(ringEntries, &ring, _sqpollEnabled ? IORING_SETUP_SQPOLL : 0 ) != 0)
          {
              throw UringError.uringSetupFailure
          }
