@@ -241,7 +241,7 @@ internal enum Posix {
         print("sysclose enter")
 
 //        let res = sysClose(descriptor)
-        let res = close(descriptor)
+        let res = SwiftGlibc.close(descriptor)
         print("sysclose exit (\(res))")
         if res == -1 {
             let err = errno
