@@ -333,6 +333,7 @@ final internal class Uring {
         var eventCount = 0
         var currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, cqeMaxCount)
         if currentCqeCount == 0 {
+            _debugPrint("io_uring_peek_batch_cqe found zero events, breaking out")
             return 0
         }
         _debugPrint("io_uring_peek_batch_cqe found [\(currentCqeCount)] events")
