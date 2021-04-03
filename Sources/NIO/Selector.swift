@@ -1155,11 +1155,11 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                     
                } else { // remove any polling if we don't have a registration for it
                     _debugPrint("We had no registration for event.fd [\(event.fd)] event.pollMask [\(event.pollMask)] event.sequenceIdentifier [\(event.sequenceIdentifier)]- should be deregistered already deregistrationsHappened[\(deregistrationsHappened)]")
-
+/*
                     ring.io_uring_prep_poll_remove(fd: event.fd,
                                                    pollMask: event.pollMask,
                                                    sequenceIdentifier: event.sequenceIdentifier,
-                                                   submitNow: false)
+                                                   submitNow: false) */
                 }
             }
         }
