@@ -216,6 +216,7 @@ class StreamChannelTest: XCTestCase {
             print("testHalfCloseOwnOutput RUNTEST chan2.close(mode: .output")
             XCTAssertNoThrow(try chan2.close(mode: .output).wait())
             print("testHalfCloseOwnOutput RUNTEST eofPromise.futureResult.wait")
+            print("testHalfCloseOwnOutput eofPromise.futureResult \(chan1) \(chan2)")
             XCTAssertNoThrow(try eofPromise.futureResult.wait())
 
             print("testHalfCloseOwnOutput RUNTEST self.buffer.writeString")
