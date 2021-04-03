@@ -329,14 +329,14 @@ final internal class Uring {
     }
     
     internal func io_uring_peek_batch_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) -> Int {
-        _debugPrint("io_uring_peek_batch_cqe")
         let mergeCQE = true
         var eventCount = 0
         var currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, cqeMaxCount)
         if currentCqeCount == 0 {
             return 0
         }
-        
+        _debugPrint("io_uring_peek_batch_cqe found [\(currentCqeCount)] events")
+
         dumpCqes("io_uring_peek_batch_cqe", count: Int(currentCqeCount))
 
         assert(currentCqeCount >= 0, "currentCqeCount should never be negative")
