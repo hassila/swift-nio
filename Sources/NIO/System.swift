@@ -239,7 +239,9 @@ internal enum Posix {
     @inline(never)
     public static func close(descriptor: CInt) throws {
         print("sysclose enter")
-        let res = sysClose(descriptor)
+
+//        let res = sysClose(descriptor)
+        let res = close(descriptor)
         print("sysclose exit (\(res))")
         if res == -1 {
             let err = errno
