@@ -116,7 +116,7 @@ final class PipePair: SocketProtocol {
     }
 
     func shutdown(how: Shutdown) throws {
-        print("pipepair shutdown how \(how)")
+//        print("pipepair shutdown how \(how)")
         switch how {
         case .RD:
             try self.inputFD.close()

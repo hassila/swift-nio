@@ -150,7 +150,7 @@ extension ChannelOutboundInvoker {
     ///     - mode: the `CloseMode` that is used
     /// - returns: the future which will be notified once the operation completes.
     public func close(mode: CloseMode = .all, file: StaticString = #file, line: UInt = #line) -> EventLoopFuture<Void> {
-        print("channelinvoker.swift close pipepair ")
+//        print("channelinvoker.swift close pipepair ")
         let promise = makePromise(file: file, line: line)
         close(mode: mode, promise: promise)
         return promise.futureResult
