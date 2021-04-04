@@ -68,6 +68,7 @@ print("PC deregister \(selector)")
     }
 
     override func reregister(selector: Selector<NIORegistration>, interested: SelectorEventSet) throws {
+        print("reregister PC")
         if self.pipePair.inputFD.isOpen {
             try selector.reregister(selectable: self.pipePair.inputFD,
                                     interested: interested.intersection([.read, .reset]))
