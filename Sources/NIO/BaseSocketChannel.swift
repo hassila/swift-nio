@@ -696,7 +696,7 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
 
         guard self.interestedEvent.contains(.write) else {
             // nothing to do if we were not previously interested in write
-            return
+//            return
         }
         self.safeReregister(interested: self.interestedEvent.subtracting(.write))
     }

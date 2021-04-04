@@ -173,6 +173,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                 self.outputShutdown = true
                 // Fail all pending writes and so ensure all pending promises are notified
                 self.pendingWrites.failAll(error: error, close: false)
+                print("unregisterForWritable")
                 self.unregisterForWritable()
                 promise?.succeed(())
 
