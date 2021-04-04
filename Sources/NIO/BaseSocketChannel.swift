@@ -694,10 +694,10 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
     func unregisterForWritable() {
         self.eventLoop.assertInEventLoop()
 
-//        guard self.interestedEvent.contains(.write) else {
+        guard self.interestedEvent.contains(.write) else {
             // nothing to do if we were not previously interested in write
-//            return
-//        }
+            return
+        }
         self.safeReregister(interested: self.interestedEvent.subtracting(.write))
     }
 
@@ -1212,12 +1212,13 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
     private final func safeReregister(interested: SelectorEventSet) {
         self.eventLoop.assertInEventLoop()
         assert(self.lifecycleManager.isRegisteredFully)
-
+print("safeReregister")
         guard self.isOpen else {
             assert(self.interestedEvent == .reset, "interestedEvent=\(self.interestedEvent) even though we're closed")
             return
         }
         if interested == interestedEvent {
+            print("safeReregister xxxxx")
             // we don't need to update and so cause a syscall if we already are registered with the correct event
             return
         }
