@@ -1213,7 +1213,7 @@ print("AAA XXX")
     private final func safeReregister(interested: SelectorEventSet) {
         self.eventLoop.assertInEventLoop()
         assert(self.lifecycleManager.isRegisteredFully)
-print("safeReregister \(SelectorEventSet)")
+print("safeReregister \(interested)")
         guard self.isOpen else {
             assert(self.interestedEvent == .reset, "interestedEvent=\(self.interestedEvent) even though we're closed")
             return
