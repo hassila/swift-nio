@@ -940,7 +940,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
     var ring = Uring()
     
     // some compile time configurations for testing different approaches
-    let multishot = true // if true, we run with streaming multishot polls, otherwise re-reg poll add.
+    let multishot = false // if true, we run with streaming multishot polls, otherwise re-reg poll add.
     let deferReregistrations = true // if true we only flush once at reentring whenReady() - saves syscalls
     var deferredReregistrationsPending = false // true if flush needed reentring whenReady()
 
@@ -1016,7 +1016,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                                   oldPollmask: oldInterested.uringEventSet,
                                   sequenceIdentifier: sequenceIdentifier,
                                   submitNow: !deferReregistrations,
-                                  multishot:multishot)
+                                  multishot: multishot)
     }
 
     override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
@@ -1091,7 +1091,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                                                 pollMask: Uring.POLLIN,
                                                 sequenceIdentifier: 0,
                                                 submitNow: false,
-                                                multishot:false)
+                                                multishot: false)
                     do {
                         _ = try EventFd.eventfd_read(fd: self.eventFD, value: &val) // consume wakeup event
                         _debugPrint("read val [\(val)] from event.fd [\(event.fd)]")
@@ -1125,13 +1125,12 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                        _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
 
                     }
-                    // FIXME: No reregistrations for reset events, but we can see clients do reregistrations...
-                    if multishot == false && shouldRefreshPollForEvent(selectorEvent:selectorEvent) { // must be before guard, otherwise lost wake
+                    if multishot == false { // must be before guard, otherwise lost wake
                         ring.io_uring_prep_poll_add(fd: event.fd,
                                                     pollMask: registration.interested.uringEventSet,
                                                     sequenceIdentifier: registration.selectableSequenceIdentifier,
-                                                    submitNow:false,
-                                                    multishot:false)
+                                                    submitNow: false,
+                                                    multishot: false)
                     }
 
                     guard selectorEvent != ._none else {
