@@ -940,7 +940,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
     var ring = Uring()
     
     // some compile time configurations for testing different approaches
-    let multishot = true // if true, we run with streaming multishot polls, otherwise re-reg poll add.
+    let multishot = false // if true, we run with streaming multishot polls, otherwise re-reg poll add.
     let deferReregistrations = true // if true we only flush once at reentring whenReady() - saves syscalls
     var deferredReregistrationsPending = false // true if flush needed reentring whenReady()
 
