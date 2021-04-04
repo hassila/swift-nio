@@ -161,14 +161,14 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
 
     final override func close0(error: Error, mode: CloseMode, promise: EventLoopPromise<Void>?) {
         do {
-//            print("final override func close0")
+            print("final override func close0")
             switch mode {
             case .output:
                 if self.outputShutdown {
                     promise?.fail(ChannelError.outputClosed)
                     return
                 }
-//                print("final self.socket.shutdown")
+                print("final self.socket.shutdown")
                 try self.socket.shutdown(how: .WR)
                 self.outputShutdown = true
                 // Fail all pending writes and so ensure all pending promises are notified

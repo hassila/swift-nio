@@ -1173,7 +1173,7 @@ extension ChannelPipeline {
     }
 
     func close(context: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {
-//        print("channelpipeline.swift close")
+        print("channelpipeline.swift close")
         context.channel._channelCore.close0(error: mode.error, mode: mode, promise: promise)
     }
 
