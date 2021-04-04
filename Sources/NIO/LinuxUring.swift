@@ -421,7 +421,7 @@ final internal class Uring {
                                 eventCount += 1
                             }
                             break
-                        case -ENOENT:    // -ENOENT returned for failed poll remove
+                        case -ENOENT:    // -ENOENT returned for failed poll remove, true when running single shot polls where event triggers with pending modifications trailing. 
 /*                            let pollError = Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
                             if mergeCQE
                             {
