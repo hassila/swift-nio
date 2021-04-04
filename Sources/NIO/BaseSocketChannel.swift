@@ -1221,7 +1221,7 @@ print("safeReregister")
         if interested == interestedEvent {
             print("safeReregister xxxxx")
             // we don't need to update and so cause a syscall if we already are registered with the correct event
-            return
+//            return
         }
         interestedEvent = interested
         do {
