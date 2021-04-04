@@ -132,7 +132,7 @@ final class PipePair: SocketProtocol {
     }
 
     func close() throws {
-        print("pipepair close how \(how)")
+        print("pipepair close  \(self.inputFD) \(self.outputFD)")
         guard self.inputFD.isOpen || self.outputFD.isOpen else {
             throw ChannelError.alreadyClosed
         }
