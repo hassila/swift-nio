@@ -57,10 +57,12 @@ final class PipeChannel: BaseStreamSocketChannel<PipePair> {
     }
 
     override func deregister(selector: Selector<NIORegistration>, mode: CloseMode) throws {
-        if (mode == .all || mode == .input) && self.pipePair.inputFD.isOpen {
+print("PC deregister \(selector)")
+    if (mode == .all || mode == .input) && self.pipePair.inputFD.isOpen {
             try selector.deregister(selectable: self.pipePair.inputFD)
         }
         if (mode == .all || mode == .output) && self.pipePair.outputFD.isOpen {
+            print("PC deregister \(mode)")
             try selector.deregister(selectable: self.pipePair.outputFD)
         }
     }
@@ -86,6 +88,7 @@ final class PipeChannel: BaseStreamSocketChannel<PipePair> {
     }
 
     override func writeEOF() {
+print("writeEOF PC")
         guard self.pipePair.outputFD.isOpen else {
             return
         }
