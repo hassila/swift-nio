@@ -701,7 +701,7 @@ public final class ChannelPipeline: ChannelInvoker {
     }
 
     public func close(mode: CloseMode = .all, promise: EventLoopPromise<Void>?) {
-//        print("channelpipeline.swift close pipepair ")
+        print("channelpipeline.swift close pipepair ")
         if eventLoop.inEventLoop {
             close0(mode: mode, promise: promise)
         } else {
