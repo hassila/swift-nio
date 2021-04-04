@@ -79,6 +79,7 @@ print("PC deregister \(selector)")
     }
 
     override func readEOF() {
+        print("readEOF PC")
         super.readEOF()
         guard self.pipePair.inputFD.isOpen else {
             return
@@ -88,6 +89,7 @@ print("PC deregister \(selector)")
     }
 
     override func writeEOF() {
+        // FIXME: Why not super.writeEOF() ?
 print("writeEOF PC")
         guard self.pipePair.outputFD.isOpen else {
             return

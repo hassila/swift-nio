@@ -203,7 +203,7 @@ internal final class SelectableEventLoop: EventLoop {
             // It's possible the EventLoop was closed before we were able to call deregister, so just return in this case as there is no harm.
             return
         }
-
+print("SEL deregister channel \(channel)")
         try channel.deregister(selector: self._selector, mode: mode)
     }
 
