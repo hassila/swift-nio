@@ -181,6 +181,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
 
                 self.pipeline.fireUserInboundEventTriggered(ChannelEvent.outputClosed)
 
+                super.close0(error: error, mode: mode, promise: promise)
             case .input:
                 if self.inputShutdown {
                     promise?.fail(ChannelError.inputClosed)
@@ -199,6 +200,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                 promise?.succeed(())
 
                 self.pipeline.fireUserInboundEventTriggered(ChannelEvent.inputClosed)
+                super.close0(error: error, mode: mode, promise: promise)
             case .all:
                 if let timeout = self.connectTimeoutScheduled {
                     self.connectTimeoutScheduled = nil
