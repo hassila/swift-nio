@@ -98,7 +98,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
             buffer.clear()
             switch try buffer.withMutableWritePointer(body: { try self.socket.read(pointer: $0) }) {
             case .processed(let bytesRead):
-                _debugPrint("Read [\(bytesRead)] from socket")
+              //  _debugPrint("Read [\(bytesRead)] from socket")
                 if bytesRead > 0{
                     let mayGrow = recvAllocator.record(actualReadBytes: bytesRead)
 
@@ -113,7 +113,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                         // Otherwise chances are good that the next read(...) call will either read nothing or only a very small amount of data.
                         // Als o this will allow us to call fireChannelReadComplete() which may give the user the chance to flush out all pending
                         // writes.
-                        _debugPrint("Read has buffer.writableBytes[\(buffer.writableBytes)]] result[\(result)]")
+                      //  _debugPrint("Read has buffer.writableBytes[\(buffer.writableBytes)]] result[\(result)]")
                         return result
                     } else if mayGrow && i < self.maxMessagesPerRead {
                         // if the ByteBuffer may grow on the next allocation due we used all the writable bytes we should allocate a new `ByteBuffer` to allow ramping up how much data
@@ -121,24 +121,24 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                         buffer = self.recvAllocator.buffer(allocator: allocator)
                     }
                 } else {
-                    _debugPrint("Read self.inputShutdown [\(self.inputShutdown)]")
+                  //  _debugPrint("Read self.inputShutdown [\(self.inputShutdown)]")
                     if self.inputShutdown {
                         // We received a EOF because we called shutdown on the fd by ourself, unregister from the Selector and return
                         self.readPending = false
                         self.unregisterForReadable()
                         return result
                     }
-                    _debugPrint("Read throw ChannelError.eof")
+                  //  _debugPrint("Read throw ChannelError.eof")
                     // end-of-file
                     throw ChannelError.eof
                 }
             case .wouldBlock(let bytesRead):
-                _debugPrint("Read wouldBlock!")
+              //  _debugPrint("Read wouldBlock!")
                 assert(bytesRead == 0)
                 return result
             }
         }
-        _debugPrint("Read return result [\(result)]")
+      //  _debugPrint("Read return result [\(result)]")
         return result
     }
 

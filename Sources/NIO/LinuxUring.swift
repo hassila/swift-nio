@@ -113,7 +113,7 @@ final internal class Uring {
             return
         }
 
-        _debugPrintCQE(header + " CQE:s [\(cqes)] - ring flags are [\(ring.flags)]")
+      //  _debugPrintCQE(header + " CQE:s [\(cqes)] - ring flags are [\(ring.flags)]")
         for i in 0..<count {
             let c = cqes[i]!.pointee
 
@@ -131,7 +131,7 @@ final internal class Uring {
             
             let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
 
-            _debugPrintCQE("\(i) = fd[\(fd)] eventType[\(String(describing:eventType))] sequenceNumber[\(sequenceNumber)] res [\(c.res)] flags [\(c.flags)]  bitpattern[\(String(describing:bitpatternAsPointer))]")
+          //  _debugPrintCQE("\(i) = fd[\(fd)] eventType[\(String(describing:eventType))] sequenceNumber[\(sequenceNumber)] res [\(c.res)] flags [\(c.flags)]  bitpattern[\(String(describing:bitpatternAsPointer))]")
         }
     }
 
@@ -162,11 +162,11 @@ final internal class Uring {
              throw UringError.uringSetupFailure
          }
         
-        _debugPrint("io_uring_queue_init \(self.ring.ring_fd)")
+      //  _debugPrint("io_uring_queue_init \(self.ring.ring_fd)")
      }
   
     internal func io_uring_queue_exit() {
-        _debugPrint("io_uring_queue_exit \(self.ring.ring_fd)")
+      //  _debugPrint("io_uring_queue_exit \(self.ring.ring_fd)")
         CNIOLinux_io_uring_queue_exit(&ring)
     }
 
@@ -194,7 +194,7 @@ final internal class Uring {
         var submissionCount = 0
         var retval : Int32
         
-//        _debugPrint("io_uring_flush")
+//      //  _debugPrint("io_uring_flush")
 
         waitingSubmissions = CNIOLinux_io_uring_sq_ready(&ring)
         
@@ -219,19 +219,19 @@ final internal class Uring {
                 // trying to get  new SQE if the actual SQE queue is full, but
                 // that would be due to user error in usage IMHO and we should fatalError there.
                 case -EAGAIN:
-                    _debugPrint("io_uring_flush io_uring_submit -EAGAIN waitingSubmissions[\(waitingSubmissions)] submissionCount[\(submissionCount)]. Breaking out and resubmitting later (whenReady() end).")
+                  //  _debugPrint("io_uring_flush io_uring_submit -EAGAIN waitingSubmissions[\(waitingSubmissions)] submissionCount[\(submissionCount)]. Breaking out and resubmitting later (whenReady() end).")
                     break loop
                 // FIXME: -ENOMEM when there is not enough memory to do internal allocations on the kernel side.
                 // Right nog we just loop with a sleep trying to buy time, but could also possibly fatalError here.
                 //   See: https://github.com/axboe/liburing/issues/309
                 case -ENOMEM:
                     usleep(1_000_000) // let's not busy loop to give the kernel some time to recover if possible
-                    _debugPrint("io_uring_flush io_uring_submit -ENOMEM \(submissionCount)")
+                  //  _debugPrint("io_uring_flush io_uring_submit -ENOMEM \(submissionCount)")
                 case 0:
-                    _debugPrint("io_uring_flush io_uring_submit submitted 0, so far needed submissionCount[\(submissionCount)] waitingSubmissions[\(waitingSubmissions)] submitted [\(retval)] SQE:s this iteration")
+                  //  _debugPrint("io_uring_flush io_uring_submit submitted 0, so far needed submissionCount[\(submissionCount)] waitingSubmissions[\(waitingSubmissions)] submitted [\(retval)] SQE:s this iteration")
                     break
                 case 1...:
-                    _debugPrint("io_uring_flush io_uring_submit needed [\(submissionCount)] submission(s), submitted [\(retval)] SQE:s out of [\(waitingSubmissions)] possible")
+                  //  _debugPrint("io_uring_flush io_uring_submit needed [\(submissionCount)] submission(s), submitted [\(retval)] SQE:s out of [\(waitingSubmissions)] possible")
                     break
                 default: // other errors
                     fatalError("Unexpected error [\(retval)] from io_uring_submit ")
@@ -239,7 +239,7 @@ final internal class Uring {
             
             waitingSubmissions = CNIOLinux_io_uring_sq_ready(&ring)
         }
-//        _debugPrint("io_uring_flush done")
+//      //  _debugPrint("io_uring_flush done")
     }
 
     internal func io_uring_prep_poll_add(fd: Int32, pollMask: UInt32, sequenceIdentifier: UInt32, submitNow: Bool = true, multishot: Bool = true) -> () {
@@ -248,7 +248,7 @@ final internal class Uring {
         let bitPattern : Int = upperQuad << 32 + Int(fd)
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
 
-        _debugPrint("io_uring_prep_poll_add fd[\(fd)] pollMask[\(pollMask)] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] submitNow[\(submitNow)] multishot[\(multishot)] upperQuad [\(upperQuad)]")
+      //  _debugPrint("io_uring_prep_poll_add fd[\(fd)] pollMask[\(pollMask)] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] submitNow[\(submitNow)] multishot[\(multishot)] upperQuad [\(upperQuad)]")
 
         CNIOLinux.io_uring_prep_poll_add(sqe, fd, pollMask)
         CNIOLinux.io_uring_sqe_set_data(sqe, bitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
@@ -280,7 +280,7 @@ final internal class Uring {
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
         let userBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: userbitPattern)
 
-        _debugPrint("io_uring_prep_poll_remove fd[\(fd)] pollMask[\(pollMask)] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] userBitpatternAsPointer[\(String(describing:userBitpatternAsPointer))] submitNow[\(submitNow)] upperQuad[\(upperQuad)] upperQuadDelete[\(upperQuadDelete)]")
+      //  _debugPrint("io_uring_prep_poll_remove fd[\(fd)] pollMask[\(pollMask)] bitpatternAsPointer[\(String(describing:bitpatternAsPointer))] userBitpatternAsPointer[\(String(describing:userBitpatternAsPointer))] submitNow[\(submitNow)] upperQuad[\(upperQuad)] upperQuadDelete[\(upperQuadDelete)]")
 
         CNIOLinux.io_uring_prep_poll_remove(sqe, bitpatternAsPointer)
         CNIOLinux.io_uring_sqe_set_data(sqe, userBitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
@@ -301,7 +301,7 @@ final internal class Uring {
         let userbitPattern : Int = upperQuadModify << 32 + Int(fd)
         let userBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: userbitPattern)
 
-        _debugPrint("io_uring_poll_update fd[\(fd)] oldPollmask[\(oldPollmask)] newPollmask[\(newPollmask)]  userBitpatternAsPointer[\(String(describing:userBitpatternAsPointer))] upperQuad[\(upperQuad)] upperQuadModify[\(upperQuadModify)]")
+      //  _debugPrint("io_uring_poll_update fd[\(fd)] oldPollmask[\(oldPollmask)] newPollmask[\(newPollmask)]  userBitpatternAsPointer[\(String(describing:userBitpatternAsPointer))] upperQuad[\(upperQuad)] upperQuadModify[\(upperQuadModify)]")
         
         // Documentation here:
         // https://git.kernel.dk/cgit/linux-block/commit/?h=poll-multiple&id=33021a19e324fb747c2038416753e63fd7cd9266
@@ -333,10 +333,10 @@ final internal class Uring {
         var eventCount = 0
         var currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, cqeMaxCount)
         if currentCqeCount == 0 {
-            _debugPrint("io_uring_peek_batch_cqe found zero events, breaking out")
+          //  _debugPrint("io_uring_peek_batch_cqe found zero events, breaking out")
             return 0
         }
-        _debugPrint("io_uring_peek_batch_cqe found [\(currentCqeCount)] events")
+      //  _debugPrint("io_uring_peek_batch_cqe found [\(currentCqeCount)] events")
 
         dumpCqes("io_uring_peek_batch_cqe", count: Int(currentCqeCount))
 
@@ -373,7 +373,7 @@ final internal class Uring {
                             }
                             break
                         case -EINVAL:
-                            _debugPrint("Failed with -EINVAL for i[\(i)]")
+                          //  _debugPrint("Failed with -EINVAL for i[\(i)]")
                             break
                         case -EBADF:
                             break
@@ -437,7 +437,7 @@ final internal class Uring {
                             }
   */                      break
                         case -EINVAL:
-                            _debugPrint("Failed with -EINVAL for i[\(i)]")
+                          //  _debugPrint("Failed with -EINVAL for i[\(i)]")
                             break
                         case -EBADF:
                             break
@@ -456,7 +456,7 @@ final internal class Uring {
             }
             if (fdEvents.count == maxevents || eventCount == maxevents)
             {
-                _debugPrint("io_uring_peek_batch_cqe breaking loop early, currentCqeCount [\(currentCqeCount)] maxevents [\(maxevents)] eventCount [\(eventCount)] mergeCQE [\(mergeCQE)]")
+              //  _debugPrint("io_uring_peek_batch_cqe breaking loop early, currentCqeCount [\(currentCqeCount)] maxevents [\(maxevents)] eventCount [\(eventCount)] mergeCQE [\(mergeCQE)]")
                 currentCqeCount = maxevents // to make sure we only cq_advance the correct amount
                 break
             }
@@ -479,25 +479,25 @@ final internal class Uring {
                 let socketClosing = (result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
 
                 if (socketClosing == true) {
-                    _debugPrint("socket is going down [\(eventKey.fileDescriptor)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
+                  //  _debugPrint("socket is going down [\(eventKey.fileDescriptor)] [\(result_mask)] [\((result_mask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)))]")
                 }
             }
             if eventCount > 0 {
-                _debugPrint("io_uring_peek_batch_cqe returning [\(eventCount)] events")
+              //  _debugPrint("io_uring_peek_batch_cqe returning [\(eventCount)] events")
             } else if fdEvents.count > 0 {
-                _debugPrint("fdEvents.count > 0 but 0 event.count returning [\(eventCount)]")
+              //  _debugPrint("fdEvents.count > 0 but 0 event.count returning [\(eventCount)]")
             }
 
             fdEvents.removeAll(keepingCapacity: true) // reused for next batch
         } else {
-            _debugPrint("io_uring_peek_batch_cqe returning [\(eventCount)] events (!mergeCQE)")
+          //  _debugPrint("io_uring_peek_batch_cqe returning [\(eventCount)] events (!mergeCQE)")
         }
         
         return eventCount
     }
 
     internal func io_uring_wait_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) throws -> Int {
-        _debugPrint("io_uring_wait_cqe")
+      //  _debugPrint("io_uring_wait_cqe")
         let error = CNIOLinux_io_uring_wait_cqe(&ring, cqes)
         var eventCount = 0
         
@@ -527,12 +527,12 @@ final internal class Uring {
                         case -ENOENT:    // -ENOENT returned for failed poll remove
                             break
                         case -EINVAL:
-                            _debugPrint("io_uring_wait_cqe failed with -EINVAL")
+                          //  _debugPrint("io_uring_wait_cqe failed with -EINVAL")
                             break
                         case -EBADF:
                             break
                         case ..<0: // other errors
-                            _debugPrint("io_uring_wait_cqe non-positive result fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))] sequenceNumber[\(sequenceNumber)]")
+                          //  _debugPrint("io_uring_wait_cqe non-positive result fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))] sequenceNumber[\(sequenceNumber)]")
                             break
                         case 0: // successfull chained add, not an event
                             break
@@ -546,7 +546,7 @@ final internal class Uring {
                             events[0].sequenceIdentifier = sequenceNumber
                             eventCount += 1
                             
-                            _debugPrint("io_uring_wait_cqe fd[\(fd)] events[0].pollMask [\(events[0].pollMask)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))] sequenceNumber[\(sequenceNumber)]")
+                          //  _debugPrint("io_uring_wait_cqe fd[\(fd)] events[0].pollMask [\(events[0].pollMask)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))] sequenceNumber[\(sequenceNumber)]")
                     }
                 case .pollModify?:
                     switch result {
@@ -571,7 +571,7 @@ final internal class Uring {
                             eventCount += 1
  */                         break
                         case -EINVAL:
-                            _debugPrint("Failed with -EINVAL pollModify")
+                          //  _debugPrint("Failed with -EINVAL pollModify")
                             break
                         case -EBADF:
                             break
@@ -595,10 +595,10 @@ final internal class Uring {
         {
             if (error == -CNIOLinux.EINTR) // we can get EINTR normally
             {
-                _debugPrint("UringError.error \(error)")
+              //  _debugPrint("UringError.error \(error)")
             } else
             {
-                _debugPrint("UringError.uringWaitCqeFailure \(error)")
+              //  _debugPrint("UringError.uringWaitCqeFailure \(error)")
                 throw UringError.uringWaitCqeFailure
             }
         }
@@ -610,7 +610,7 @@ final internal class Uring {
         var ts = timeout.kernelTimespec()
         var eventCount = 0
 
-        _debugPrint("io_uring_wait_cqe_timeout.ETIME milliseconds \(ts)")
+      //  _debugPrint("io_uring_wait_cqe_timeout.ETIME milliseconds \(ts)")
 
         let error = CNIOLinux_io_uring_wait_cqe_timeout(&ring, cqes, &ts)
 
@@ -640,12 +640,12 @@ final internal class Uring {
                             case -ENOENT:    // -ENOENT returned for failed poll remove
                                 break
                             case -EINVAL:
-                                _debugPrint("io_uring_wait_cqe_timeout failed with -EINVAL")
+                              //  _debugPrint("io_uring_wait_cqe_timeout failed with -EINVAL")
                                 break
                             case -EBADF:
                                 break
                             case ..<0: // other errors
-                                _debugPrint("io_uring_wait_cqe_timeout non-positive result fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                              //  _debugPrint("io_uring_wait_cqe_timeout non-positive result fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)] cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
                                 break
                             case 0: // successfull chained add, not an event
                                 break
@@ -659,7 +659,7 @@ final internal class Uring {
                                 events[0].sequenceIdentifier = sequenceNumber
                                 eventCount += 1
                                 
-                                _debugPrint("io_uring_wait_cqe_timeout fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
+                              //  _debugPrint("io_uring_wait_cqe_timeout fd[\(fd)] eventType[\(String(describing:eventType))] bitPattern[\(bitPattern)]  cqes[0]!.pointee.res[\(String(describing:cqes[0]!.pointee.res))]")
                         }
                     case .pollModify?:
                         switch result {
@@ -684,7 +684,7 @@ final internal class Uring {
                                 eventCount += 1
  */                             break
                             case -EINVAL:
-                                _debugPrint("Failed with -EINVAL pollModify")
+                              //  _debugPrint("Failed with -EINVAL pollModify")
                                 break
                             case -EBADF:
                                 break
@@ -704,7 +704,7 @@ final internal class Uring {
 
                 CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
             case -CNIOLinux.ETIME: // timed out
-                _debugPrint("io_uring_wait_cqe_timeout timed out with -CNIOLinux.ETIME")
+              //  _debugPrint("io_uring_wait_cqe_timeout timed out with -CNIOLinux.ETIME")
                 CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
             case -CNIOLinux.EINTR:
                 break
