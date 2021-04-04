@@ -694,11 +694,11 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
     func unregisterForWritable() {
         self.eventLoop.assertInEventLoop()
 print("AAA XXX")
-        guard self.interestedEvent.contains(.write) else {
-            print("AAA XXX ZZZZ")
+//        guard self.interestedEvent.contains(.write) else {
+//            print("AAA XXX ZZZZ")
             // nothing to do if we were not previously interested in write
-            return
-        }
+//            return
+//        }
         self.safeReregister(interested: self.interestedEvent.subtracting(.write))
     }
 
