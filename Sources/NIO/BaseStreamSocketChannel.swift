@@ -175,7 +175,9 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                 self.pendingWrites.failAll(error: error, close: false)
                 print("unregisterForWritable")
                 self.unregisterForWritable()
+                print("unregisterForWritable done")
                 promise?.succeed(())
+                print("unregisterForWritable done promise")
 
                 self.pipeline.fireUserInboundEventTriggered(ChannelEvent.outputClosed)
 
