@@ -446,6 +446,7 @@ internal class Selector<R: Registration> {
             guard let reg = registrations.removeValue(forKey: Int(fd)) else {
                 return
             }
+            print("deregistration for \(fd)")
             try self._deregister(selectable: selectable, fd: Int(fd), oldInterested: reg.interested, sequenceIdentifier: reg.selectableSequenceIdentifier)
         }
     }
