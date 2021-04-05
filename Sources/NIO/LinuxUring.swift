@@ -143,7 +143,7 @@ final internal class Uring {
     }
     
     static let _sqpollEnabled: Bool = {
-        NIOBSDSDebugPrint.getEnvironmentVar("IORING_SETUP_SQPOLL") != nil // set this env. var to enable SQPOLL
+        getEnvironmentVar("IORING_SETUP_SQPOLL") != nil // set this env. var to enable SQPOLL
     }()
     
     internal func io_uring_queue_init() throws -> () {
@@ -417,7 +417,7 @@ final internal class Uring {
 
         for cqeIndex in 0 ..< currentCqeCount
         {
-            _process_cqe(events: events, cqeIndex: cqeIndex)
+            _process_cqe(events: events, cqeIndex: Int(cqeIndex))
 
             if (fdEvents.count == maxevents)
             {
@@ -448,7 +448,7 @@ final internal class Uring {
         return eventCount
     }
 
-    internal func _io_uring_wait_cqe_shared(events: UnsafeMutablePointer<UringEvent>, error: Int) throws -> Int {
+    internal func _io_uring_wait_cqe_shared(events: UnsafeMutablePointer<UringEvent>, error: Int32) throws -> Int {
         var eventCount = 0
 
         switch error {
@@ -473,9 +473,9 @@ final internal class Uring {
         CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
 
         if let firstEvent = fdEvents.first {
-            events[0].fd = firstEvent.eventKey.fileDescriptor
-            events[0].pollMask = firstEvent.pollMask
-            events[0].sequenceIdentifier = firstEvent.eventKey.sequenceIdentifier
+            events[0].fd = firstEvent.key.fileDescriptor
+            events[0].pollMask = firstEvent.value
+            events[0].sequenceIdentifier = firstEvent.key.sequenceIdentifier
             eventCount = 1
         } else {
             _debugPrint("_io_uring_wait_cqe_shared if let firstEvent = fdEvents.first failed")
