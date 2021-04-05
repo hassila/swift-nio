@@ -66,7 +66,6 @@ public final class NIOFileHandle: FileDescriptor {
 
     public func close() throws {
         try withUnsafeFileDescriptor { fd in
-//            print("Posix.close(descriptor: \(fd))")
             try Posix.close(descriptor: fd)
         }
 

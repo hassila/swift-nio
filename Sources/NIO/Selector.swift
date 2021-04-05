@@ -348,7 +348,7 @@ internal class Selector<R: Registration> {
     // writes: `self.externalSelectorFDLock` AND access from the EventLoop thread
     fileprivate var selectorFD: CInt = -1 // -1 == we're closed
     fileprivate let myThread: NIOThread
-    private var currentSelectableSequenceIdentifier : UInt32 = 1
+    private var currentSelectableSequenceIdentifier : SelectableSequenceIdentifier = 1
 
     internal func testsOnly_withUnsafeSelectorFD<T>(_ body: (CInt) throws -> T) throws -> T {
         assert(self.myThread != NIOThread.current)
@@ -360,7 +360,7 @@ internal class Selector<R: Registration> {
         }
     }
 
-    internal func _testsOnly_init () { // needed for SAL, don't want to open access for lifecycleState, normal subclasses of Selector sets this in init after calling super.init() and finishing initializing.
+    internal func _testsOnly_init () { // needed for SAL, don't want to open access for lifecycleState, normal subclasses of Selector sets this in init after calling super.init() and finishing initializing, but SAL can't access due to fileprivate.
         self.lifecycleState = .open
     }
 
@@ -405,7 +405,7 @@ internal class Selector<R: Registration> {
             assert(registrations[Int(fd)] == nil)
             try self._register(selectable : selectable, fd: Int(fd), interested: interested, sequenceIdentifier: currentSelectableSequenceIdentifier)
             registrations[Int(fd)] = makeRegistration(interested)
-            registrations[Int(fd)]?.selectableSequenceIdentifier = currentSelectableSequenceIdentifier
+            registrations[Int(fd)]?.selectableSequenceIdentifier = currentSelectableSequenceIdentifier 
             currentSelectableSequenceIdentifier &+= 1 // we are ok to overflow
         }
     }

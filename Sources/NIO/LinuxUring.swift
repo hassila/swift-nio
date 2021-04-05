@@ -31,7 +31,6 @@ internal enum UringError: Error {
     case loadFailure
     case uringSetupFailure
     case uringWaitCqeFailure
-    case uringWaitCqeTimeoutFailure
 }
 
 internal extension TimeAmount {
@@ -88,6 +87,7 @@ final internal class Uring {
     private let cqeMaxCount : UInt32 = 4096 // shouldn't be more than ringEntries, this is the max chunk of CQE we take.
         
     var cqes : UnsafeMutablePointer<UnsafeMutablePointer<io_uring_cqe>?>
+    let mergeCQE = true // merge all events for same fd, sequence_identifier
     var fdEvents = [fdEventKey : UInt32]() // fd, sequence_identifier : event_poll_return
     var emptyCqe = io_uring_cqe()
 
@@ -119,15 +119,9 @@ final internal class Uring {
 
             let dp = io_uring_cqe_get_data(cqes[i])
             let bitPattern : UInt = UInt(bitPattern:dp)
-
-//            let fd = Int(bitPattern & 0x00000000FFFFFFFF)
-//            let eventType = Int(bitPattern >> 32) // shift out the fd
-
             let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
             let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) & 0x00FFFFFF)
-//            let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) & 0xFF000000) // shift out the fd
             let eventType = CqeEventType(rawValue:((Int(bitPattern) >> 32) & 0xFF000000) >> 24) // shift out the fd
-
             
             let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
 
@@ -242,6 +236,7 @@ final internal class Uring {
 //        _debugPrint("io_uring_flush done")
     }
 
+    // we stuff event type into the upper byte, the next 3 bytes gives us the sequence number (16M before wrap) and final 4 bytes are fd.
     internal func io_uring_prep_poll_add(fd: Int32, pollMask: UInt32, sequenceIdentifier: UInt32, submitNow: Bool = true, multishot: Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
         let upperQuad : Int = Int(CqeEventType.poll.rawValue) << 24 + (Int(sequenceIdentifier) & 0x00FFFFFF)
@@ -273,10 +268,8 @@ final internal class Uring {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
         let upperQuad : Int = Int(CqeEventType.poll.rawValue) << 24 + (Int(sequenceIdentifier) & 0x00FFFFFF)
         let bitPattern : Int = upperQuad << 32 + Int(fd)
-//        let bitPattern : Int = CqeEventType.poll.rawValue << 32 + Int(fd) // must be same as the poll for liburing to match
         let upperQuadDelete : Int = Int(CqeEventType.pollDelete.rawValue) << 24 + (Int(sequenceIdentifier) & 0x00FFFFFF)
         let userbitPattern : Int = upperQuadDelete << 32 + Int(fd)
-//        let userbitPattern : Int = CqeEventType.pollDelete.rawValue << 32 + Int(fd)
         let bitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: bitPattern)
         let userBitpatternAsPointer = UnsafeMutableRawPointer.init(bitPattern: userbitPattern)
 
@@ -292,9 +285,7 @@ final internal class Uring {
 
     internal func io_uring_poll_update(fd: Int32, newPollmask: UInt32, oldPollmask: UInt32, sequenceIdentifier: UInt32, submitNow: Bool = true, multishot : Bool = true) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
-//        let upperQuad : Int = CqeEventType.poll.rawValue << 24 + (sequenceIdentifier & 0x00FFFFFF)
         let upperQuad : Int = Int(CqeEventType.poll.rawValue) << 24 + (Int(sequenceIdentifier) & 0x00FFFFFF)
-//        let upperQuadModify : Int = CqeEventType.pollModify.rawValue << 24 + (sequenceIdentifier & 0x00FFFFFF)
         let upperQuadModify : Int = Int(CqeEventType.pollModify.rawValue) << 24 + (Int(sequenceIdentifier) & 0x00FFFFFF)
         let oldBitpattern : Int = upperQuad << 32 + Int(fd)
         let newBitpattern : Int = upperQuad << 32 + Int(fd)
@@ -328,8 +319,194 @@ final internal class Uring {
         }
     }
     
+    // Merge results into fdEvents on fd, sequenceIdentifier for the given CQE
+    internal func _process_cqe(events: UnsafeMutablePointer<UringEvent>, cqeIndex: Int) {
+        // asserts here
+        let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[cqeIndex]))
+        let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
+        let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) & 0x00FFFFFF)
+        let eventType = CqeEventType(rawValue:((Int(bitPattern) >> 32) & 0xFF000000) >> 24) // shift out the fd
+        let result = cqes[cqeIndex]!.pointee.res
+
+        switch eventType {
+            case .poll?:
+                switch result {
+                    case -ECANCELED: // -ECANCELED for streaming polls, should signal error
+                        assert(fd >= 0, "fd must be greater than zero")
+                        
+                        let pollError = Uring.POLLERR | Uring.POLLHUP
+                        if let current = fdEvents[fdEventKey(fd, sequenceNumber)] {
+                            fdEvents[fdEventKey(fd, sequenceNumber)] = current | pollError
+                        } else {
+                            fdEvents[fdEventKey(fd, sequenceNumber)] = pollError
+                        }
+                        break
+                    case -EINVAL:
+                        _debugPrint("Failed with -EINVAL for cqeIndex[\(cqeIndex)]")
+                        break
+                    case -EBADF:
+                        _debugPrint("Failed with -EBADF for cqeIndex[\(cqeIndex)]")
+                        break
+                    case ..<0: // other errors
+                        _debugPrint("Failed with unexpected error (\(result) for cqeIndex[\(cqeIndex)]")
+                        break
+                    case 0: // successfull chained add, not an event
+                        break
+                    default: // positive success
+                        assert(bitPattern > 0, "Bitpattern should never be zero")
+                        assert(fd >= 0, "fd must be greater than zero")
+                        let uresult = UInt32(result)
+                        
+                        if let current = fdEvents[fdEventKey(fd, sequenceNumber)] {
+                            fdEvents[fdEventKey(fd, sequenceNumber)] =  current | uresult
+                        } else {
+                            fdEvents[fdEventKey(fd, sequenceNumber)] = uresult
+                        }
+                }
+            case .pollModify?:
+                switch result {
+                    case -EALREADY:
+                        break
+                    case -ECANCELED: // -ECANCELED for streaming polls, should signal error
+                        assert(fd >= 0, "fd must be greater than zero")
+                        
+                        let pollError = Uring.POLLERR // Uring.POLLERR // (Uring.POLLHUP | Uring.POLLERR)
+                        if let current = fdEvents[fdEventKey(fd, sequenceNumber)] {
+                            fdEvents[fdEventKey(fd, sequenceNumber)] = current | pollError
+                        } else {
+                            fdEvents[fdEventKey(fd, sequenceNumber)] = pollError
+                        }
+                        break
+                    case -ENOENT:
+                        _debugPrint("Failed with -ENOENT for cqeIndex [\(cqeIndex)]")
+                        break
+                    case -EINVAL:
+                        _debugPrint("Failed with -EINVAL for cqeIndex[\(cqeIndex)]")
+                        break
+                    case -EBADF:
+                        break
+                    case ..<0: // other errors
+                        break
+                    case 0: // successfull chained add, not an event
+                        break
+                    default: // positive success
+                        fatalError("pollModify returned > 0")
+                }
+                break
+            case .pollDelete?:
+                break
+            default:
+                assertionFailure("Unknown type")
+        }
+
+    }
+ 
     internal func io_uring_peek_batch_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) -> Int {
-        let mergeCQE = true
+        var eventCount = 0
+        var currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, cqeMaxCount)
+        if currentCqeCount == 0 {
+            _debugPrint("io_uring_peek_batch_cqe found zero events, breaking out")
+            return 0
+        }
+        _debugPrint("io_uring_peek_batch_cqe found [\(currentCqeCount)] events")
+
+        dumpCqes("io_uring_peek_batch_cqe", count: Int(currentCqeCount))
+
+        assert(currentCqeCount >= 0, "currentCqeCount should never be negative")
+        assert(maxevents > 0, "maxevents should be a positive number")
+
+        for cqeIndex in 0 ..< currentCqeCount
+        {
+            _process_cqe(events: events, cqeIndex: cqeIndex)
+
+            if (fdEvents.count == maxevents)
+            {
+                _debugPrint("io_uring_peek_batch_cqe breaking loop early, currentCqeCount [\(currentCqeCount)] maxevents [\(maxevents)]")
+                currentCqeCount = maxevents // to make sure we only cq_advance the correct amount
+                break
+            }
+        }
+
+        io_uring_cq_advance(&ring, currentCqeCount) // bulk variant of io_uring_cqe_seen(&ring, dataPointer)
+
+        //  we just return single event per fd, sequencenumber pair
+        eventCount = 0
+        for (eventKey, pollMask) in fdEvents {
+            assert(eventCount < maxevents)
+            assert(eventKey.fileDescriptor >= 0)
+
+            events[eventCount].fd = eventKey.fileDescriptor
+            events[eventCount].pollMask = pollMask
+            events[eventCount].sequenceIdentifier = eventKey.sequenceIdentifier
+            eventCount += 1
+        }
+        
+        fdEvents.removeAll(keepingCapacity: true) // reused for next batch
+
+        _debugPrint("io_uring_peek_batch_cqe returning [\(eventCount)] events, fdEvents.count [\(fdEvents.count)]")
+
+        return eventCount
+    }
+
+    internal func _io_uring_wait_cqe_shared(events: UnsafeMutablePointer<UringEvent>, error: Int) throws -> Int {
+        var eventCount = 0
+
+        switch error {
+            case 0:
+                break
+            case -CNIOLinux.EINTR:
+                _debugPrint("_io_uring_wait_cqe_shared got CNIOLinux.EINTR")
+                return eventCount
+            case -CNIOLinux.ETIME:
+                _debugPrint("_io_uring_wait_cqe_shared timed out with -CNIOLinux.ETIME")
+                CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
+                return eventCount
+            default:
+                _debugPrint("UringError.uringWaitCqeFailure \(error)")
+                throw UringError.uringWaitCqeFailure
+        }
+        
+        dumpCqes("_io_uring_wait_cqe_shared")
+
+        _process_cqe(events: events, cqeIndex: 0)
+
+        CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
+
+        if let firstEvent = fdEvents.first {
+            events[0].fd = firstEvent.eventKey.fileDescriptor
+            events[0].pollMask = firstEvent.pollMask
+            events[0].sequenceIdentifier = firstEvent.eventKey.sequenceIdentifier
+            eventCount = 1
+        } else {
+            _debugPrint("_io_uring_wait_cqe_shared if let firstEvent = fdEvents.first failed")
+        }
+
+        fdEvents.removeAll(keepingCapacity: true) // reused for next batch
+        
+        return eventCount
+    }
+
+    
+    internal func io_uring_wait_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) throws -> Int {
+        _debugPrint("io_uring_wait_cqe")
+
+        let error = CNIOLinux_io_uring_wait_cqe(&ring, cqes)
+        
+        return try _io_uring_wait_cqe_shared(events: events, error: error)
+    }
+
+    internal func io_uring_wait_cqe_timeout(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32, timeout: TimeAmount) throws -> Int {
+        var ts = timeout.kernelTimespec()
+
+        _debugPrint("io_uring_wait_cqe_timeout.ETIME milliseconds \(ts)")
+
+        let error = CNIOLinux_io_uring_wait_cqe_timeout(&ring, cqes, &ts)
+
+        return try _io_uring_wait_cqe_shared(events: events, error: error)
+    }
+
+    /*
+    internal func io_uring_peek_batch_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) -> Int {
         var eventCount = 0
         var currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, cqeMaxCount)
         if currentCqeCount == 0 {
@@ -461,7 +638,7 @@ final internal class Uring {
                 break
             }
         }
-
+    
         io_uring_cq_advance(&ring, currentCqeCount) // bulk variant of io_uring_cqe_seen(&ring, dataPointer)
 
         //  if running with merging, just return single event per fd, sequencenumber pair
@@ -507,9 +684,7 @@ final internal class Uring {
             let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[0]))
             let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
             let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) & 0x00FFFFFF)
-//            let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) & 0xFF000000) // shift out the fd
             let eventType = CqeEventType(rawValue:((Int(bitPattern) >> 32) & 0xFF000000) >> 24) // shift out the fd
-//            let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
             let result = cqes[0]!.pointee.res
             
             switch eventType {
@@ -620,9 +795,7 @@ final internal class Uring {
                 let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[0]))
                 let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
                 let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) & 0x00FFFFFF)
-//                let eventType = CqeEventType(rawValue:(Int(bitPattern ) >> 32) & 0xFF000000) // shift out the fd
                 let eventType = CqeEventType(rawValue:((Int(bitPattern) >> 32) & 0xFF000000) >> 24) // shift out the fd
-//                let eventType = CqeEventType(rawValue:Int(bitPattern) >> 32) // shift out the fd
                 let result = cqes[0]!.pointee.res
 
                 switch eventType {
@@ -714,6 +887,8 @@ final internal class Uring {
         
         return eventCount
     }
+     */
+
 }
 
 #endif

@@ -258,7 +258,6 @@ extension _ChannelOutboundHandler {
     }
 
     public func close(context: ChannelHandlerContext, mode: CloseMode, promise: EventLoopPromise<Void>?) {
-        print("channelhandler.swift close pipepair ")
         context.close(mode: mode, promise: promise)
     }
 

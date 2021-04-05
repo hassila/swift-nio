@@ -239,8 +239,6 @@ internal enum Posix {
     @inline(never)
     public static func close(descriptor: CInt) throws {
         let res = sysClose(descriptor)
-
-//        print("close(\(descriptor)) = (\(res))")
         if res == -1 {
             let err = errno
 
@@ -250,18 +248,6 @@ internal enum Posix {
             // For more details see:
             //     - https://bugs.chromium.org/p/chromium/issues/detail?id=269623
             //     - https://lwn.net/Articles/576478/
-            // On Linux this is ok, see close() man page quote:
-            // The EINTR error is a somewhat special case.  Regarding the EINTR
-            //    error, POSIX.1-2008 says:
-
-            //             If close() is interrupted by a signal that is to be
-            //           caught, it shall return -1 with errno set to EINTR and the
-            //             state of fildes is unspecified.
-
-            //  This permits the behavior that occurs on Linux and many other
-            //  implementations, where, as with other errors that may be reported
-            //  by close(), the file descriptor is guaranteed to be closed.
-            
             if err != EINTR {
                 preconditionIsNotUnacceptableErrno(err: err, where: #function)
                 throw IOError(errnoCode: err, reason: "close")

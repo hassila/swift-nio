@@ -26,25 +26,6 @@ extension Shutdown {
     }
 }
 
-internal struct NIOBSDSDebugPrint {
-    static func getEnvironmentVar(_ name: String) -> String? {
-        guard let rawValue = getenv(name) else { return nil }
-        return String(cString: rawValue)
-    }
-
-    static let _debugPrintEnabled: Bool = {
-        NIOBSDSDebugPrint.getEnvironmentVar("NIO_SOCKET") != nil
-    }()
-    
-    static func _debugPrint(_ s : @autoclosure () -> String)
-    {
-        if NIOBSDSDebugPrint._debugPrintEnabled {
-//            print("X [\(NIOThread.current)] " + s())
-            print("X ----> " + s())
-        }
-    }
-}
-
 // MARK: Implementation of _BSDSocketProtocol for POSIX systems
 extension NIOBSDSocket {
     static func accept(socket s: NIOBSDSocket.Handle,
@@ -60,7 +41,6 @@ extension NIOBSDSocket {
     }
 
     static func close(socket s: NIOBSDSocket.Handle) throws {
-        NIOBSDSDebugPrint._debugPrint("Close socket [\(s)]")
         return try Posix.close(descriptor: s)
     }
 
@@ -135,7 +115,6 @@ extension NIOBSDSocket {
     }
 
     static func shutdown(socket: NIOBSDSocket.Handle, how: Shutdown) throws {
-        NIOBSDSDebugPrint._debugPrint("Shutdown socket [\(socket)]")
         return try Posix.shutdown(descriptor: socket, how: how)
     }
 

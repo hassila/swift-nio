@@ -116,7 +116,6 @@ final class PipePair: SocketProtocol {
     }
 
     func shutdown(how: Shutdown) throws {
-        print("pipepair shutdown how \(how)")
         switch how {
         case .RD:
             try self.inputFD.close()
@@ -132,7 +131,6 @@ final class PipePair: SocketProtocol {
     }
 
     func close() throws {
-        print("pipepair close  \(self.inputFD) \(self.outputFD)")
         guard self.inputFD.isOpen || self.outputFD.isOpen else {
             throw ChannelError.alreadyClosed
         }

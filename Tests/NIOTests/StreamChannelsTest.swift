@@ -203,24 +203,15 @@ class StreamChannelTest: XCTestCase {
 
     func testHalfCloseOwnOutput() throws {
         func runTest(chan1: Channel, chan2: Channel) throws {
-            print("testHalfCloseOwnOutput RUNTEST \(chan1) \(chan2)")
             let readPromise = chan2.eventLoop.makePromise(of: Void.self)
             let eofPromise = chan1.eventLoop.makePromise(of: Void.self)
 
-//            print("testHalfCloseOwnOutput RUNTEST try chan1.setOption(ChannelOptions.allowRemoteHalfClosure")
             XCTAssertNoThrow(try chan1.setOption(ChannelOptions.allowRemoteHalfClosure, value: true).wait())
-//            print("testHalfCloseOwnOutput RUNTEST pipeline.addHandler(FulfillOnFirstEventHandler")
             XCTAssertNoThrow(try chan1.pipeline.addHandler(FulfillOnFirstEventHandler(userInboundEventTriggeredPromise: eofPromise)).wait())
 
             // let's close chan2's output
-//            print("testHalfCloseOwnOutput RUNTEST chan2.close(mode: .output")
-//            XCTAssertNoThrow(try chan2.close(mode: .input).wait())
             XCTAssertNoThrow(try chan2.close(mode: .output).wait())
-//            print("testHalfCloseOwnOutput RUNTEST eofPromise.futureResult.wait")
-//            print("testHalfCloseOwnOutput eofPromise.futureResult \(chan1) \(chan2)")
             XCTAssertNoThrow(try eofPromise.futureResult.wait())
-
-//            print("testHalfCloseOwnOutput RUNTEST self.buffer.writeString")
 
             self.buffer.writeString("X")
             XCTAssertNoThrow(try chan2.pipeline.addHandler(FulfillOnFirstEventHandler(channelReadPromise: readPromise)).wait())
@@ -239,7 +230,6 @@ class StreamChannelTest: XCTestCase {
 
     func testHalfCloseOwnInput() {
         func runTest(chan1: Channel, chan2: Channel) throws {
-            print("testHalfCloseOwnInput RUNTEST \(chan1) \(chan2)")
 
             let readPromise = chan1.eventLoop.makePromise(of: Void.self)
 
@@ -247,7 +237,6 @@ class StreamChannelTest: XCTestCase {
             // let's close chan2's input
             XCTAssertNoThrow(try chan2.close(mode: .input).wait())
 
-            print("testHalfCloseOwnInput RUNTEST self.buffer.writeString")
             self.buffer.writeString("X")
             XCTAssertNoThrow(try chan1.pipeline.addHandler(FulfillOnFirstEventHandler(channelReadPromise: readPromise)).wait())
 

@@ -98,8 +98,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
             buffer.clear()
             switch try buffer.withMutableWritePointer(body: { try self.socket.read(pointer: $0) }) {
             case .processed(let bytesRead):
-                _debugPrint("Read [\(bytesRead)] from socket")
-                if bytesRead > 0{
+                if bytesRead > 0 {
                     let mayGrow = recvAllocator.record(actualReadBytes: bytesRead)
 
                     self.readPending = false
@@ -111,9 +110,8 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                     if buffer.writableBytes > 0 {
                         // If we did not fill the whole buffer with read(...) we should stop reading and wait until we get notified again.
                         // Otherwise chances are good that the next read(...) call will either read nothing or only a very small amount of data.
-                        // Als o this will allow us to call fireChannelReadComplete() which may give the user the chance to flush out all pending
+                        // Also this will allow us to call fireChannelReadComplete() which may give the user the chance to flush out all pending
                         // writes.
-                        _debugPrint("Read has buffer.writableBytes[\(buffer.writableBytes)]] result[\(result)]")
                         return result
                     } else if mayGrow && i < self.maxMessagesPerRead {
                         // if the ByteBuffer may grow on the next allocation due we used all the writable bytes we should allocate a new `ByteBuffer` to allow ramping up how much data
@@ -121,24 +119,20 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                         buffer = self.recvAllocator.buffer(allocator: allocator)
                     }
                 } else {
-                    _debugPrint("Read self.inputShutdown [\(self.inputShutdown)]")
                     if self.inputShutdown {
                         // We received a EOF because we called shutdown on the fd by ourself, unregister from the Selector and return
                         self.readPending = false
                         self.unregisterForReadable()
                         return result
                     }
-                    _debugPrint("Read throw ChannelError.eof")
                     // end-of-file
                     throw ChannelError.eof
                 }
             case .wouldBlock(let bytesRead):
-                _debugPrint("Read wouldBlock!")
                 assert(bytesRead == 0)
                 return result
             }
         }
-        _debugPrint("Read return result [\(result)]")
         return result
     }
 
@@ -161,27 +155,21 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
 
     final override func close0(error: Error, mode: CloseMode, promise: EventLoopPromise<Void>?) {
         do {
-            print("final override func close0")
             switch mode {
             case .output:
                 if self.outputShutdown {
                     promise?.fail(ChannelError.outputClosed)
                     return
                 }
-                print("final self.socket.shutdown")
                 try self.socket.shutdown(how: .WR)
                 self.outputShutdown = true
                 // Fail all pending writes and so ensure all pending promises are notified
                 self.pendingWrites.failAll(error: error, close: false)
-                print("unregisterForWritable")
                 self.unregisterForWritable()
-                print("unregisterForWritable done")
                 promise?.succeed(())
-                print("unregisterForWritable done promise")
 
                 self.pipeline.fireUserInboundEventTriggered(ChannelEvent.outputClosed)
 
-                super.close0(error: error, mode: mode, promise: promise)
             case .input:
                 if self.inputShutdown {
                     promise?.fail(ChannelError.inputClosed)
@@ -200,7 +188,6 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                 promise?.succeed(())
 
                 self.pipeline.fireUserInboundEventTriggered(ChannelEvent.inputClosed)
-                super.close0(error: error, mode: mode, promise: promise)
             case .all:
                 if let timeout = self.connectTimeoutScheduled {
                     self.connectTimeoutScheduled = nil

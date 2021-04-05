@@ -191,11 +191,6 @@ private struct SocketChannelLifecycleManager {
         return self.currentState != .closed
     }
 }
-struct BSCDebugPrint {
-    internal static let _debugPrintEnabled: Bool = {
-        getEnvironmentVar("NIO_BSC") != nil
-    }()
-}
 
 /// The base class for all socket-based channels in NIO.
 ///
@@ -218,13 +213,6 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
         init(local: SocketAddress?, remote: SocketAddress?) {
             self.local = local
             self.remote = remote
-        }
-    }
-
-    public func _debugPrint(_ s : @autoclosure () -> String)
-    {
-        if BSCDebugPrint._debugPrintEnabled {
-            print("B [\(NIOThread.current)] " + s())
         }
     }
 
@@ -693,9 +681,8 @@ class BaseSocketChannel<SocketType: BaseSocketProtocol>: SelectableChannel, Chan
 
     func unregisterForWritable() {
         self.eventLoop.assertInEventLoop()
-print("AAA XXX")
+
         guard self.interestedEvent.contains(.write) else {
-//            print("AAA XXX ZZZZ")
             // nothing to do if we were not previously interested in write
             return
         }
@@ -997,7 +984,6 @@ print("AAA XXX")
             self.safeReregister(interested: self.interestedEvent.subtracting(.readEOF))
 
             loop: while self.lifecycleManager.isActive {
-                _debugPrint("readEOF0 -> switch self.readable0()")
                 switch self.readable0() {
                 case .eof:
                     // on EOF we stop the loop and we're done with our processing for `readEOF`.
@@ -1009,7 +995,6 @@ print("AAA XXX")
                     assert(!self.lifecycleManager.isPreRegistered)
                     break loop
                 case .normal(.none):
-                    // FIXME: We fail on this condition with uring on some tests, needs discussion
                     preconditionFailure("got .readEOF and read returned not reading any bytes, nor EOF.")
                 case .normal(.some):
                     // normal, note that there is no guarantee we're still active (as the user might have closed in callout)
@@ -1023,7 +1008,6 @@ print("AAA XXX")
     // other words: Failing to unregister the whole selector will cause NIO to spin at 100% CPU constantly delivering
     // the `reset` event.
     final func reset() {
-        _debugPrint("reset -> readEOF0")
         self.readEOF0()
 
         if self.socket.isOpen {
@@ -1074,11 +1058,7 @@ print("AAA XXX")
         let readResult: ReadResult
         do {
             readResult = try self.readFromSocket()
-            _debugPrint("readResult = try self.readFromSocket() [\(readResult)]")
-
-//            _debugPrint("readable0 self.readFromSocket() readResult[\(readResult)]")
         } catch let err {
-            _debugPrint("readResult = try self.readFromSocket() catch let err [\(err)]")
             let readStreamState: ReadStreamState
             // ChannelError.eof is not something we want to fire through the pipeline as it just means the remote
             // peer closed / shutdown the connection.
@@ -1213,13 +1193,12 @@ print("AAA XXX")
     private final func safeReregister(interested: SelectorEventSet) {
         self.eventLoop.assertInEventLoop()
         assert(self.lifecycleManager.isRegisteredFully)
-print("safeReregister \(interested)")
+
         guard self.isOpen else {
             assert(self.interestedEvent == .reset, "interestedEvent=\(self.interestedEvent) even though we're closed")
             return
         }
         if interested == interestedEvent {
-            print("safeReregister xxxxx")
             // we don't need to update and so cause a syscall if we already are registered with the correct event
             return
         }

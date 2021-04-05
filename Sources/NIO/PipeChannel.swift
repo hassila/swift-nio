@@ -57,18 +57,15 @@ final class PipeChannel: BaseStreamSocketChannel<PipePair> {
     }
 
     override func deregister(selector: Selector<NIORegistration>, mode: CloseMode) throws {
-print("PC deregister \(selector)")
-    if (mode == .all || mode == .input) && self.pipePair.inputFD.isOpen {
+        if (mode == .all || mode == .input) && self.pipePair.inputFD.isOpen {
             try selector.deregister(selectable: self.pipePair.inputFD)
         }
         if (mode == .all || mode == .output) && self.pipePair.outputFD.isOpen {
-            print("PC deregister \(mode)")
             try selector.deregister(selectable: self.pipePair.outputFD)
         }
     }
 
     override func reregister(selector: Selector<NIORegistration>, interested: SelectorEventSet) throws {
-        print("reregister PC")
         if self.pipePair.inputFD.isOpen {
             try selector.reregister(selectable: self.pipePair.inputFD,
                                     interested: interested.intersection([.read, .reset]))
@@ -80,7 +77,6 @@ print("PC deregister \(selector)")
     }
 
     override func readEOF() {
-        print("readEOF PC")
         super.readEOF()
         guard self.pipePair.inputFD.isOpen else {
             return
@@ -90,7 +86,6 @@ print("PC deregister \(selector)")
     }
 
     override func writeEOF() {
-print("writeEOF PC")
         guard self.pipePair.outputFD.isOpen else {
             return
         }
