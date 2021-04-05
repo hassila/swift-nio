@@ -494,9 +494,9 @@ final internal class Uring {
     }
 
     internal func io_uring_wait_cqe_timeout(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32, timeout: TimeAmount) throws -> Int {
-        _debugPrint("io_uring_wait_cqe_timeout.ETIME milliseconds \(ts)")
-
         var ts = timeout.kernelTimespec()
+
+        _debugPrint("io_uring_wait_cqe_timeout.ETIME milliseconds \(ts)")
 
         let error = CNIOLinux_io_uring_wait_cqe_timeout(&ring, cqes, &ts)
 
