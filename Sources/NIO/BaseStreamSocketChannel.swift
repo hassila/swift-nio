@@ -153,7 +153,13 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
         return result
     }
 
-    override func close0(error: Error, mode: CloseMode, promise: EventLoopPromise<Void>?) {
+    func _close0_cleanup(mode: CloseMode) // for e.g. PipeChannel to do custom cleanup
+    {
+        return
+    }
+
+    
+    final override func close0(error: Error, mode: CloseMode, promise: EventLoopPromise<Void>?) {
         do {
             switch mode {
             case .output:
@@ -166,6 +172,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                 // Fail all pending writes and so ensure all pending promises are notified
                 self.pendingWrites.failAll(error: error, close: false)
                 self.unregisterForWritable()
+                _close0_cleanup(mode:mode)
                 promise?.succeed(())
 
                 self.pipeline.fireUserInboundEventTriggered(ChannelEvent.outputClosed)
@@ -185,6 +192,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                 }
                 self.inputShutdown = true
                 self.unregisterForReadable()
+                _close0_cleanup(mode:mode)
                 promise?.succeed(())
 
                 self.pipeline.fireUserInboundEventTriggered(ChannelEvent.inputClosed)
@@ -193,6 +201,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                     self.connectTimeoutScheduled = nil
                     timeout.cancel()
                 }
+                _close0_cleanup(mode:mode)
                 super.close0(error: error, mode: mode, promise: promise)
             }
         } catch let err {

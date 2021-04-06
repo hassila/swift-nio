@@ -92,74 +92,17 @@ final class PipeChannel: BaseStreamSocketChannel<PipePair> {
         try! self.selectableEventLoop.deregister(channel: self, mode: .output)
         try! self.pipePair.outputFD.close()
     }
-    /*
-    override func close0(error: Error, mode: CloseMode, promise: EventLoopPromise<Void>?) {
-        do {
-            switch mode {
-            case .output:
-                if self.outputShutdown {
-                    promise?.fail(ChannelError.outputClosed)
-                    return
-                }
-                try self.socket.shutdown(how: .WR)
-                self.outputShutdown = true
-                // Fail all pending writes and so ensure all pending promises are notified
-                self.pendingWrites.failAll(error: error, close: false)
-                self.unregisterForWritable()
-                try self.selectableEventLoop.deregister(selectable:self.pipePair.outputFD)
 
-                promise?.succeed(())
-
-                self.pipeline.fireUserInboundEventTriggered(ChannelEvent.outputClosed)
-
-            case .input:
-                if self.inputShutdown {
-                    promise?.fail(ChannelError.inputClosed)
-                    return
-                }
-                switch error {
-                case ChannelError.eof:
-                    // No need to explicit call socket.shutdown(...) as we received an EOF and the call would only cause
-                    // ENOTCON
-                    break
-                default:
-                    try socket.shutdown(how: .RD)
-                }
-                self.inputShutdown = true
-                self.unregisterForReadable()
-                try self.selectableEventLoop.deregister(selectable:self.pipePair.inputFD)
-                promise?.succeed(())
-
-                self.pipeline.fireUserInboundEventTriggered(ChannelEvent.inputClosed)
-            case .all:
-                if let timeout = self.connectTimeoutScheduled {
-                    self.connectTimeoutScheduled = nil
-                    timeout.cancel()
-                }
-                super.super.close0(error: error, mode: mode, promise: promise)
-            }
-        } catch let err {
-            promise?.fail(err)
-        }
-    }
-*/
-    /*
-    
-    override func close0(error: Error, mode: CloseMode, promise: EventLoopPromise<Void>?) {
-        super.close0(error: error, mode: mode, promise: promise)
+    override func _close0_cleanup(mode: CloseMode) {
         switch mode {
             case .input:
-//                    try! self.selectableEventLoop.deregister(selectable:self.pipePair.outputFD)
-                break
+                try! self.selectableEventLoop.deregister(selectable:self.pipePair.inputFD)
             case .output:
-//                    try! self.selectableEventLoop.deregister(selectable:self.pipePair.inputFD)
-                break
+                try! self.selectableEventLoop.deregister(selectable:self.pipePair.outputFD)
             case .all:
-//                    try! self.selectableEventLoop.deregister(selectable:self.pipePair.outputFD)
-//                    try! self.selectableEventLoop.deregister(selectable:self.pipePair.inputFD)
                 break
         }
-    }*/
+    }
 }
 
 extension PipeChannel: CustomStringConvertible {
