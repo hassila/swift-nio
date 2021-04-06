@@ -94,19 +94,15 @@ final class PipeChannel: BaseStreamSocketChannel<PipePair> {
     }
     
     override func close0(error: Error, mode: CloseMode, promise: EventLoopPromise<Void>?) {
+        super.close0(error: error, mode: mode, promise: promise)
         switch mode {
             case .input:
-                if self.pipePair.inputFD.isOpen {
                     try! self.selectableEventLoop.deregister(channel: self, mode: .input)
-                }
             case .output:
-                if self.pipePair.outputFD.isOpen {
                     try! self.selectableEventLoop.deregister(channel: self, mode: .output)
-                }
             case .all:
                 break
         }
-        super.close0(error: error, mode: mode, promise: promise)
     }
 
 }
