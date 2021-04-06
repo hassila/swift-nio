@@ -96,9 +96,12 @@ final class PipeChannel: BaseStreamSocketChannel<PipePair> {
     override func _close0_cleanup(mode: CloseMode) {
         switch mode {
             case .input:
-                try! self.selectableEventLoop.deregister(selectable:self.pipePair.inputFD)
+                try! self.selectableEventLoop.deregister(channel: self, mode: .input)
+
+//                try! self.selectableEventLoop.deregister(selectable:self.pipePair.inputFD)
             case .output:
-                try! self.selectableEventLoop.deregister(selectable:self.pipePair.outputFD)
+                try! self.selectableEventLoop.deregister(channel: self, mode: .output)
+//                try! self.selectableEventLoop.deregister(selectable:self.pipePair.outputFD)
             case .all:
                 break
         }
