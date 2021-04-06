@@ -295,6 +295,7 @@ int CNIOLinux_io_uring_load()
     
     if (_check_capabilities() != 0) {
         (void) dlclose(dl_handle); // we don't care about errors, nothing we can do anyway
+        fprintf(stderr, "_check_capabilities not ok.\n");
         return -1;
     }
     fprintf(stderr, "_check_capabilities ok.\n");
