@@ -453,7 +453,7 @@ final internal class Uring {
         return eventCount
     }
 
-    internal func _io_uring_wait_cqe_shared(events: UnsafeMutablePointer<UringEvent>, error: Int32) throws -> Int {
+    internal func _io_uring_wait_cqe_shared(events: UnsafeMutablePointer<UringEvent>, error: Int32, multishot : Bool) throws -> Int {
         var eventCount = 0
 
         switch error {
