@@ -207,6 +207,16 @@ internal final class SelectableEventLoop: EventLoop {
         try channel.deregister(selector: self._selector, mode: mode)
     }
 
+    /// Deregister the given `Selectable` from this `SelectableEventLoop`s `Selector` needed for PipeChannels..
+    internal func deregister<S: Selectable>(selectable: S) throws {
+        self.assertInEventLoop()
+        guard self.isOpen else {
+            // It's possible the EventLoop was closed before we were able to call deregister, so just return in this case as there is no harm.
+            return
+        }
+
+        try self._selector.deregister(selectable:selectable)
+    }
     /// Register the given `SelectableChannel` with this `SelectableEventLoop`. This should be done whenever `channel.interestedEvents` has changed and it should be taken into account when
     /// waiting for new I/O for the given `SelectableChannel`.
     internal func reregister<C: SelectableChannel>(channel: C) throws {
