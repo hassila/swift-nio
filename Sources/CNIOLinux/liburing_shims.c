@@ -189,7 +189,7 @@ int _check_capabilities() {
 #define SWIFTNIO_URING_MIN_SIZE 4
 #define SWIFTNIO_URING_MAX_SIZE 65536
 
-int CNIOLinux_io_uring_ring_size() {
+unsigned int CNIOLinux_io_uring_ring_size() {
     const char *uring_size = getenv("SWIFTNIO_URING_RING_SIZE");
     int size = 0;
 
@@ -210,7 +210,7 @@ int CNIOLinux_io_uring_ring_size() {
 }
 
 // whether to use multishot poll / poll updates
-int CNIOLinux_io_uring_use_multishot_poll() {
+unsigned int CNIOLinux_io_uring_use_multishot_poll() {
     return (getenv("SWIFTNIO_URING_USE_NEW_POLL") != NULL)?1:0;
 }
 

@@ -164,6 +164,10 @@ final internal class Uring {
         CNIOLinux_io_uring_queue_exit(&ring)
     }
 
+    static internal func io_uring_use_multishot_poll() -> Bool {
+        return CNIOLinux_io_uring_use_multishot_poll() == 0 ? false : true
+    }
+    
     //   Ok, this was a real bummer - turns out that flushing multiple SQE:s
     //   can fail midflight and this will actually happen for real when e.g. a socket
     //   has gone down and we are re-registering polls this means we will silently lose any

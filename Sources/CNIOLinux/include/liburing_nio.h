@@ -90,8 +90,8 @@ unsigned CNIOLinux_io_uring_sq_ready(const struct io_uring *ring);
 int CNIOLinux_io_uring_opcode_supported(const struct io_uring_probe *p, int op);
 
 // Extra interfaces
-int CNIOLinux_io_uring_ring_size(); // return ring size to use
-int CNIOLinux_io_uring_use_multishot_poll(); // true if we should use multishot poll/updates
+unsigned int CNIOLinux_io_uring_ring_size(); // return ring size to use
+unsigned int CNIOLinux_io_uring_use_multishot_poll(); // true if we should use multishot poll/updates
 
 #endif /* __linux__ */
 
