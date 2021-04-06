@@ -1025,7 +1025,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                                            sequenceIdentifier: sequenceIdentifier,
                                            submitNow:!deferReregistrations)
             ring.io_uring_prep_poll_add(fd: Int32(fd),
-                                        pollMask: interested.uringEventSet,
+                                        pollMask: newInterested.uringEventSet,
                                         sequenceIdentifier: sequenceIdentifier,
                                         submitNow: !deferReregistrations,
                                         multishot: multishot)
