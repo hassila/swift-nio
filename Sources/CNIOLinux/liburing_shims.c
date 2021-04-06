@@ -217,11 +217,11 @@ int _check_capabilities() {
     struct io_uring_probe *probe = CNIOLinux_io_uring_get_probe();
     int capabilities_check;
     
-    capabilities_check = CNIOLinux_io_uring_opcode_supported(probe, IORING_OP_POLL_ADD) |
+    capabilities_check = CNIOLinux_io_uring_opcode_supported(probe, IORING_OP_POLL_ADD) &
                          CNIOLinux_io_uring_opcode_supported(probe, IORING_OP_POLL_REMOVE);
 
     CNIOLinux_io_uring_free_probe(probe);
-    return capabilities_check;
+    return capabilities_check == 1 ? 0 : -1;
 }
 
 int CNIOLinux_io_uring_load()
