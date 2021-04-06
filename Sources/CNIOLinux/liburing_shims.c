@@ -136,45 +136,6 @@ static struct _liburing_functions_t
 // dynamically load liburing and resolve symbols. Should be called once before using io_uring.
 // returns 0 on successful loading and resolving of functions, otherwise error
 
-// getting kernel version, just adopted from SO answer.
-
-// Disabled for now, checking kernel version is not a robust way
-// to check for capabilities as they may be backported.
-
-/*
-#define KERNEL_MIN_MAJOR_VERSION 5
-#define KERNEL_MIN_MINOR_VERSION 12
-#define VER_SIZE 16
-int _check_compatible_kernel_version() {
-    struct utsname buffer;
-    char *p;
-    long ver[VER_SIZE];
-    int i=0;
-
-    if (uname(&buffer) != 0) {
-        return -1;
-    }
-
-    p = buffer.release;
-
-    while (*p && i < VER_SIZE) {
-        if (isdigit(*p)) {
-            ver[i] = strtol(p, &p, 10);
-            i++;
-        } else {
-            p++;
-        }
-    }
-    
-    if ((i >= 1) &&
-        ((ver[0] > KERNEL_MIN_MAJOR_VERSION) ||
-        ((ver[0] == KERNEL_MIN_MAJOR_VERSION) && (ver[1] >= KERNEL_MIN_MINOR_VERSION)))) {
-        return 0;
-    }
-
-    return -1;
-}
-*/
 // Definitons from syscall.c in liburing, we'll just do a syscall that will fail
 // to check for availability of the interface - better than checking specific kernel
 // versions as support can be backported to earlier kernels
@@ -224,6 +185,35 @@ int _check_capabilities() {
     return capabilities_check == 1 ? 0 : -1;
 }
 
+#define SWIFTNIO_URING_DEFAULT_SIZE 4096
+#define SWIFTNIO_URING_MIN_SIZE 4
+#define SWIFTNIO_URING_MAX_SIZE 65536
+
+int CNIOLinux_io_uring_ring_size() {
+    const char *uring_size = getenv("SWIFTNIO_URING_RING_SIZE");
+    int size = 0;
+
+    if (!uring_size)
+        return SWIFTNIO_URING_DEFAULT_SIZE;
+    
+    size = strtol(uring_size, NULL, 0);
+
+    if (size < SWIFTNIO_URING_MIN_SIZE) {
+        return SWIFTNIO_URING_MIN_SIZE;
+    }
+
+    if (size > SWIFTNIO_URING_MAX_SIZE) {
+        return SWIFTNIO_URING_MAX_SIZE;
+    }
+    
+    return size;
+}
+
+// whether to use multishot poll / poll updates
+int CNIOLinux_io_uring_use_multishot_poll() {
+    return (getenv("SWIFTNIO_URING_USE_NEW_POLL") != NULL)?1:0;
+}
+
 int CNIOLinux_io_uring_load()
 {
     void *dl_handle;
@@ -234,23 +224,22 @@ int CNIOLinux_io_uring_load()
     return -1;
 #endif
 
-    // are we running on a compatible kernel version
-//    if (_check_compatible_kernel_version() != 0) {
-//        return -1;
-//    }
     // do the kernel have io_uring syscalls?
     if (_check_syscall_available() != 0) {
         fprintf(stderr, "io_uring syscall not available.\n");
         return -1;
     }
-    
-    fprintf(stderr, "io_uring syscall available.\n");
 
-    // FIXME: Should document this somewhere
-    // have we manually diabled liburing?
-    if (getenv("SWIFTNIO_DISABLE_URING") != NULL) // Just an esacpe hatch - allows testing with epoll
+    // have we manually enabled liburing?
+    if (getenv("SWIFTNIO_URING_ENABLED") == NULL)
     {
-        fprintf(stderr, "SWIFTNIO_DISABLE_URING set, disabling liburing.\n");
+        return -1;
+    }
+    
+    // have we explicitly diabled liburing?
+    if (getenv("SWIFTNIO_URING_DISABLED") != NULL) // Just an esacpe hatch - allows for easier testing with epoll
+    {
+        fprintf(stderr, "SWIFTNIO_URING_DISABLED set, disabling liburing.\n");
         return -1;
     }
     
@@ -292,13 +281,10 @@ int CNIOLinux_io_uring_load()
     _DL_RESOLVE(__io_uring_get_cqe);
         
     // Finally after resolving, probe actual capabilities
-    
     if (_check_capabilities() != 0) {
         (void) dlclose(dl_handle); // we don't care about errors, nothing we can do anyway
-        fprintf(stderr, "_check_capabilities not ok.\n");
         return -1;
     }
-    fprintf(stderr, "_check_capabilities ok.\n");
 
     return 0;
 }

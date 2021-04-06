@@ -940,9 +940,10 @@ final internal class UringSelector<R: Registration>: Selector<R> {
     var ring = Uring()
     
     // some compile time configurations for testing different approaches
-    let multishot = true // if true, we run with streaming multishot polls, otherwise re-reg poll add.
+    let multishot = CNIOLinux_io_uring_use_multishot_poll() // if true, we run with streaming multishot polls
     let deferReregistrations = true // if true we only flush once at reentring whenReady() - saves syscalls
-    var deferredReregistrationsPending = false // true if flush needed reentring whenReady()
+
+    var deferredReregistrationsPending = false // true if flush needed when reentring whenReady()
 
     private static func allocateEventsArray(capacity: Int) -> UnsafeMutablePointer<EventType> {
         let events: UnsafeMutablePointer<EventType> = UnsafeMutablePointer.allocate(capacity: capacity)
@@ -1011,12 +1012,24 @@ final internal class UringSelector<R: Registration>: Selector<R> {
         _debugPrint("Re-register old \(oldInterested) new \(newInterested) uringEventSet [\(oldInterested.uringEventSet)] reg.uringEventSet [\(newInterested.uringEventSet)]")
 
         deferredReregistrationsPending = true
-        ring.io_uring_poll_update(fd: Int32(fd),
-                                  newPollmask: newInterested.uringEventSet,
-                                  oldPollmask: oldInterested.uringEventSet,
-                                  sequenceIdentifier: sequenceIdentifier,
-                                  submitNow: !deferReregistrations,
-                                  multishot: multishot)
+        if multishot {
+            ring.io_uring_poll_update(fd: Int32(fd),
+                                      newPollmask: newInterested.uringEventSet,
+                                      oldPollmask: oldInterested.uringEventSet,
+                                      sequenceIdentifier: sequenceIdentifier,
+                                      submitNow: !deferReregistrations,
+                                      multishot: multishot)
+        } else {
+            ring.io_uring_prep_poll_remove(fd: Int32(fd),
+                                           pollMask: oldInterested.uringEventSet,
+                                           sequenceIdentifier: sequenceIdentifier,
+                                           submitNow:!deferReregistrations)
+            ring.io_uring_prep_poll_add(fd: Int32(fd),
+                                        pollMask: interested.uringEventSet,
+                                        sequenceIdentifier: sequenceIdentifier,
+                                        submitNow: !deferReregistrations,
+                                        multishot: multishot)
+        }
     }
 
     override func _deregister<S: Selectable>(selectable: S, fd: Int, oldInterested: SelectorEventSet, sequenceIdentifier : UInt32 = 0) throws {
