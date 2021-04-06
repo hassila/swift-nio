@@ -104,7 +104,6 @@ final class PipeChannel: BaseStreamSocketChannel<PipePair> {
                 break
         }
     }
-
 }
 
 extension PipeChannel: CustomStringConvertible {

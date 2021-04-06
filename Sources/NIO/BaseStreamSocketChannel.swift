@@ -166,6 +166,9 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                 // Fail all pending writes and so ensure all pending promises are notified
                 self.pendingWrites.failAll(error: error, close: false)
                 self.unregisterForWritable()
+                if self is PipeChannel {
+                    try! self.selectableEventLoop.deregister(channel: self, mode: .input)
+                }
                 promise?.succeed(())
 
                 self.pipeline.fireUserInboundEventTriggered(ChannelEvent.outputClosed)
