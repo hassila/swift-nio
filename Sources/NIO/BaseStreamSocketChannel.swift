@@ -182,13 +182,13 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                     promise?.fail(ChannelError.inputClosed)
                     return
                 }
-//                _close0_cleanup(mode:mode)
                 switch error {
                 case ChannelError.eof:
                     // No need to explicit call socket.shutdown(...) as we received an EOF and the call would only cause
                     // ENOTCON
                     break
                 default:
+                    _close0_cleanup(mode:mode)
                     try socket.shutdown(how: .RD)
                 }
                 self.inputShutdown = true
