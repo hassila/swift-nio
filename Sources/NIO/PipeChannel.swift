@@ -97,9 +97,11 @@ final class PipeChannel: BaseStreamSocketChannel<PipePair> {
         super.close0(error: error, mode: mode, promise: promise)
         switch mode {
             case .input:
-                    try! self.selectableEventLoop.deregister(channel: self, mode: .input)
+//                    try! self.selectableEventLoop.deregister(channel: self, mode: .input)
+                break
             case .output:
-                    try! self.selectableEventLoop.deregister(channel: self, mode: .output)
+//                    try! self.selectableEventLoop.deregister(channel: self, mode: .output)
+                break
             case .all:
                 break
         }
