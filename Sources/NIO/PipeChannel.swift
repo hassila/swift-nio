@@ -92,6 +92,17 @@ final class PipeChannel: BaseStreamSocketChannel<PipePair> {
         try! self.selectableEventLoop.deregister(channel: self, mode: .output)
         try! self.pipePair.outputFD.close()
     }
+    
+    override func close0(error: Error, mode: CloseMode, promise: EventLoopPromise<Void>?) {
+        if mode == .input && self.pipePair.inputFD.isOpen {
+            try! self.selectableEventLoop.deregister(channel: self, mode: .input)
+        }
+        if mode == .output && self.pipePair.outputFD.isOpen {
+            try! self.selectableEventLoop.deregister(channel: self, mode: .output)
+        }
+        super.close0(error: error, mode: mode, promise: promise)
+    }
+
 }
 
 extension PipeChannel: CustomStringConvertible {

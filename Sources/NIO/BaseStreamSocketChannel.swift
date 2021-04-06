@@ -153,7 +153,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
         return result
     }
 
-    final override func close0(error: Error, mode: CloseMode, promise: EventLoopPromise<Void>?) {
+    override func close0(error: Error, mode: CloseMode, promise: EventLoopPromise<Void>?) {
         do {
             switch mode {
             case .output:
