@@ -163,6 +163,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
         do {
             switch mode {
             case .output:
+                _close0_cleanup(mode:mode)
                 if self.outputShutdown {
                     promise?.fail(ChannelError.outputClosed)
                     return
@@ -172,7 +173,6 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                 // Fail all pending writes and so ensure all pending promises are notified
                 self.pendingWrites.failAll(error: error, close: false)
                 self.unregisterForWritable()
-                _close0_cleanup(mode:mode)
                 promise?.succeed(())
 
                 self.pipeline.fireUserInboundEventTriggered(ChannelEvent.outputClosed)
@@ -182,6 +182,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                     promise?.fail(ChannelError.inputClosed)
                     return
                 }
+                _close0_cleanup(mode:mode)
                 switch error {
                 case ChannelError.eof:
                     // No need to explicit call socket.shutdown(...) as we received an EOF and the call would only cause
@@ -192,7 +193,6 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                 }
                 self.inputShutdown = true
                 self.unregisterForReadable()
-                _close0_cleanup(mode:mode)
                 promise?.succeed(())
 
                 self.pipeline.fireUserInboundEventTriggered(ChannelEvent.inputClosed)
