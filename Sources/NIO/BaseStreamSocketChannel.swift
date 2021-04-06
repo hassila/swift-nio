@@ -167,7 +167,7 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                 self.pendingWrites.failAll(error: error, close: false)
                 self.unregisterForWritable()
                 if self is PipeChannel {
-                    try! self.selectableEventLoop.deregister(channel: self, mode: .input)
+                    try! self.selectableEventLoop.deregister(channel: self, mode: .output)
                 }
                 promise?.succeed(())
 
