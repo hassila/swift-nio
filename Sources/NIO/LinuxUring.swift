@@ -496,7 +496,7 @@ final internal class Uring {
 
         let error = CNIOLinux_io_uring_wait_cqe(&ring, cqes)
         
-        return try _io_uring_wait_cqe_shared(events: events, error: error)
+        return try _io_uring_wait_cqe_shared(events: events, error: error, multishot:multishot)
     }
 
     internal func io_uring_wait_cqe_timeout(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32, timeout: TimeAmount, multishot : Bool = true) throws -> Int {
