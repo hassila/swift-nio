@@ -138,7 +138,10 @@ static struct _liburing_functions_t
 
 // getting kernel version, just adopted from SO answer.
 
-// FIXME: Should replace these with actual kernel version where multishot poll is integrated, likely 5.13
+// Disabled for now, checking kernel version is not a robust way
+// to check for capabilities as they may be backported.
+
+/*
 #define KERNEL_MIN_MAJOR_VERSION 5
 #define KERNEL_MIN_MINOR_VERSION 12
 #define VER_SIZE 16
@@ -171,6 +174,55 @@ int _check_compatible_kernel_version() {
 
     return -1;
 }
+*/
+// Definitons from syscall.c in liburing, we'll just do a syscall that will fail
+// to check for availability of the interface - better than checking specific kernel
+// versions as support can be backported to earlier kernels
+
+#ifdef __alpha__
+/*
+ * alpha is the only exception, all other architectures
+ * have common numbers for new system calls.
+ */
+# ifndef __NR_io_uring_setup
+#  define __NR_io_uring_setup        535
+# endif
+# ifndef __NR_io_uring_enter
+#  define __NR_io_uring_enter        536
+# endif
+# ifndef __NR_io_uring_register
+#  define __NR_io_uring_register    537
+# endif
+#else /* !__alpha__ */
+# ifndef __NR_io_uring_setup
+#  define __NR_io_uring_setup        425
+# endif
+# ifndef __NR_io_uring_enter
+#  define __NR_io_uring_enter        426
+# endif
+# ifndef __NR_io_uring_register
+#  define __NR_io_uring_register    427
+# endif
+#endif
+
+int _check_syscall_available() {
+    errno = 0;
+    if (syscall(__NR_io_uring_register, 0, IORING_UNREGISTER_BUFFERS, NULL, 0) && errno == ENOSYS) {
+        return -1;
+    }
+    return 0;
+}
+
+int _check_capabilities() {
+    struct io_uring_probe *probe = CNIOLinux_io_uring_get_probe();
+    int capabilities_check;
+    
+    capabilities_check = CNIOLinux_io_uring_opcode_supported(probe, IORING_OP_POLL_ADD) |
+                         CNIOLinux_io_uring_opcode_supported(probe, IORING_OP_POLL_REMOVE);
+
+    CNIOLinux_io_uring_free_probe(probe);
+    return capabilities_check;
+}
 
 int CNIOLinux_io_uring_load()
 {
@@ -183,10 +235,17 @@ int CNIOLinux_io_uring_load()
 #endif
 
     // are we running on a compatible kernel version
-    if (_check_compatible_kernel_version() != 0) {
+//    if (_check_compatible_kernel_version() != 0) {
+//        return -1;
+//    }
+    // do the kernel have io_uring syscalls?
+    if (_check_syscall_available() != 0) {
+        fprintf(stderr, "io_uring syscall not available.\n");
         return -1;
     }
     
+    fprintf(stderr, "io_uring syscall available.\n");
+
     // FIXME: Should document this somewhere
     // have we manually diabled liburing?
     if (getenv("SWIFTNIO_DISABLE_URING") != NULL) // Just an esacpe hatch - allows testing with epoll
@@ -232,6 +291,14 @@ int CNIOLinux_io_uring_load()
     _DL_RESOLVE(__io_uring_sqring_wait);
     _DL_RESOLVE(__io_uring_get_cqe);
         
+    // Finally after resolving, probe actual capabilities
+    
+    if (_check_capabilities() != 0) {
+        (void) dlclose(dl_handle); // we don't care about errors, nothing we can do anyway
+        return -1;
+    }
+    fprintf(stderr, "_check_capabilities ok.\n");
+
     return 0;
 }
 
@@ -284,7 +351,6 @@ void CNIOLinux_io_uring_free_probe(struct io_uring_probe *probe)
 {
     return liburing_functions.io_uring_free_probe(probe);
 }
-
 
 int CNIOLinux_io_uring_queue_init_params(unsigned entries, struct io_uring *ring,
     struct io_uring_params *p)
@@ -477,6 +543,10 @@ unsigned CNIOLinux_io_uring_sq_ready(const struct io_uring *ring)
     return io_uring_sq_ready(ring);
 }
 
+int CNIOLinux_io_uring_opcode_supported(const struct io_uring_probe *p, int op)
+{
+    return io_uring_opcode_supported(p, op);
+}
 
 /*inline extern struct io_uring_sqe *CNIOLinux_io_uring_get_sqe(struct io_uring *ring)
 {

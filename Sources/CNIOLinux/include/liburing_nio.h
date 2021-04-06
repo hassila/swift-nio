@@ -87,6 +87,7 @@ int CNIOLinux___io_uring_get_cqe(struct io_uring *ring,
 // don't want to pull in directly.
 int CNIOLinux_io_uring_wait_cqe(struct io_uring *ring, struct io_uring_cqe **cqe_ptr);
 unsigned CNIOLinux_io_uring_sq_ready(const struct io_uring *ring);
+int CNIOLinux_io_uring_opcode_supported(const struct io_uring_probe *p, int op);
 
 #endif /* __linux__ */
 
