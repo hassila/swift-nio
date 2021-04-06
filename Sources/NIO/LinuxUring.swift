@@ -321,7 +321,7 @@ final internal class Uring {
     }
 
     // Merge results into fdEvents on fd, sequenceIdentifier for the given CQE
-    internal func _process_cqe(events: UnsafeMutablePointer<UringEvent>, cqeIndex: Int) {
+    internal func _process_cqe(events: UnsafeMutablePointer<UringEvent>, cqeIndex: Int, multishot: Bool) {
         let bitPattern : UInt = UInt(bitPattern:io_uring_cqe_get_data(cqes[cqeIndex]))
         let fd = Int32(bitPattern & 0x00000000FFFFFFFF)
         let sequenceNumber : UInt32 = UInt32((Int(bitPattern) >> 32) & 0x00FFFFFF)
@@ -334,13 +334,15 @@ final internal class Uring {
             case .poll?:
                 switch result {
                     case -ECANCELED: // -ECANCELED for streaming polls, should signal error
-                        assert(fd >= 0, "fd must be greater than zero")
+                        if multishot {
+                            assert(fd >= 0, "fd must be greater than zero")
 
-                        let pollError = Uring.POLLERR | Uring.POLLHUP
-                        if let current = fdEvents[fdEventKey(fd, sequenceNumber)] {
-                            fdEvents[fdEventKey(fd, sequenceNumber)] = current | pollError
-                        } else {
-                            fdEvents[fdEventKey(fd, sequenceNumber)] = pollError
+                            let pollError = Uring.POLLERR | Uring.POLLHUP
+                            if let current = fdEvents[fdEventKey(fd, sequenceNumber)] {
+                                fdEvents[fdEventKey(fd, sequenceNumber)] = current | pollError
+                            } else {
+                                fdEvents[fdEventKey(fd, sequenceNumber)] = pollError
+                            }
                         }
                         break
                     case -EINVAL:
@@ -402,7 +404,7 @@ final internal class Uring {
         }
     }
 
-    internal func io_uring_peek_batch_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) -> Int {
+    internal func io_uring_peek_batch_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32, multishot : Bool = true) -> Int {
         var eventCount = 0
         var currentCqeCount = CNIOLinux_io_uring_peek_batch_cqe(&ring, cqes, cqeMaxCount)
 
@@ -420,7 +422,7 @@ final internal class Uring {
 
         for cqeIndex in 0 ..< currentCqeCount
         {
-            _process_cqe(events: events, cqeIndex: Int(cqeIndex))
+            _process_cqe(events: events, cqeIndex: Int(cqeIndex), multishot:multishot)
 
             if (fdEvents.count == maxevents) // ensure we don't generate more events than maxevents
             {
@@ -471,7 +473,7 @@ final internal class Uring {
 
         dumpCqes("_io_uring_wait_cqe_shared")
 
-        _process_cqe(events: events, cqeIndex: 0)
+        _process_cqe(events: events, cqeIndex: 0, multishot:multishot)
 
         CNIOLinux.io_uring_cqe_seen(&ring, cqes[0])
 
@@ -489,7 +491,7 @@ final internal class Uring {
         return eventCount
     }
 
-    internal func io_uring_wait_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32) throws -> Int {
+    internal func io_uring_wait_cqe(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32, multishot : Bool = true) throws -> Int {
         _debugPrint("io_uring_wait_cqe")
 
         let error = CNIOLinux_io_uring_wait_cqe(&ring, cqes)
@@ -497,14 +499,14 @@ final internal class Uring {
         return try _io_uring_wait_cqe_shared(events: events, error: error)
     }
 
-    internal func io_uring_wait_cqe_timeout(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32, timeout: TimeAmount) throws -> Int {
+    internal func io_uring_wait_cqe_timeout(events: UnsafeMutablePointer<UringEvent>, maxevents: UInt32, timeout: TimeAmount, multishot : Bool = true) throws -> Int {
         var ts = timeout.kernelTimespec()
 
         _debugPrint("io_uring_wait_cqe_timeout.ETIME milliseconds \(ts)")
 
         let error = CNIOLinux_io_uring_wait_cqe_timeout(&ring, cqes, &ts)
 
-        return try _io_uring_wait_cqe_shared(events: events, error: error)
+        return try _io_uring_wait_cqe_shared(events: events, error: error, multishot:multishot)
     }
 }
 

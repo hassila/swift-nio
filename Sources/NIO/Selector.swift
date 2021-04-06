@@ -1018,7 +1018,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                                       oldPollmask: oldInterested.uringEventSet,
                                       sequenceIdentifier: sequenceIdentifier,
                                       submitNow: !deferReregistrations,
-                                      multishot: multishot)
+                                      multishot: true)
         } else {
             ring.io_uring_prep_poll_remove(fd: Int32(fd),
                                            pollMask: oldInterested.uringEventSet,
@@ -1028,7 +1028,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                                         pollMask: newInterested.uringEventSet,
                                         sequenceIdentifier: sequenceIdentifier,
                                         submitNow: !deferReregistrations,
-                                        multishot: multishot)
+                                        multishot: false)
         }
     }
 
@@ -1080,17 +1080,17 @@ final internal class UringSelector<R: Registration>: Selector<R> {
         switch strategy {
         case .now:
             _debugPrint("whenReady.now")
-            ready = Int(ring.io_uring_peek_batch_cqe(events: events, maxevents: UInt32(eventsCapacity)))
+            ready = Int(ring.io_uring_peek_batch_cqe(events: events, maxevents: UInt32(eventsCapacity), multishot:multishot))
         case .blockUntilTimeout(let timeAmount):
             _debugPrint("whenReady.blockUntilTimeout")
-            ready = try Int(ring.io_uring_wait_cqe_timeout(events: events, maxevents: UInt32(eventsCapacity), timeout:timeAmount))
+            ready = try Int(ring.io_uring_wait_cqe_timeout(events: events, maxevents: UInt32(eventsCapacity), timeout:timeAmount, multishot:multishot))
         case .block:
             _debugPrint("whenReady.block")
-            ready = Int(ring.io_uring_peek_batch_cqe(events: events, maxevents: UInt32(eventsCapacity))) // first try to consume any existing
+            ready = Int(ring.io_uring_peek_batch_cqe(events: events, maxevents: UInt32(eventsCapacity), multishot:multishot)) // first try to consume any existing
 
             if (ready <= 0)   // otherwise block (only single supported, but we will use batch peek cqe next run around...
             {
-                ready = try ring.io_uring_wait_cqe(events: events, maxevents: UInt32(eventsCapacity))
+                ready = try ring.io_uring_wait_cqe(events: events, maxevents: UInt32(eventsCapacity), multishot:multishot)
             }
         }
 
