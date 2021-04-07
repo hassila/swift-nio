@@ -92,6 +92,7 @@ int CNIOLinux_io_uring_opcode_supported(const struct io_uring_probe *p, int op);
 // Extra interfaces
 unsigned int CNIOLinux_io_uring_ring_size(); // return ring size to use
 unsigned int CNIOLinux_io_uring_use_multishot_poll(); // true if we should use multishot poll/updates
+void CNIOLinux_io_uring_set_link_flag(struct io_uring_sqe *sqe); // set IOSQE_IO_LINK
 
 #endif /* __linux__ */
 

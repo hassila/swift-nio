@@ -547,4 +547,10 @@ inline void CNIOLinux_io_uring_submit(struct io_uring *ring)
 }
 */
 
+void CNIOLinux_io_uring_set_link_flag(struct io_uring_sqe *sqe)
+{
+    sqe->flags |= IOSQE_IO_LINK;
+    return;
+}
+
 #endif

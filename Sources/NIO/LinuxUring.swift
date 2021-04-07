@@ -80,6 +80,7 @@ final internal class Uring {
     internal static let POLLERR: CUnsignedInt = numericCast(CNIOLinux.POLLERR)
     internal static let POLLRDHUP: CUnsignedInt = numericCast(CNIOLinux.EPOLLRDHUP.rawValue) // FIXME: - POLLRDHUP not in ubuntu headers?!
     internal static let POLLHUP: CUnsignedInt = numericCast(CNIOLinux.POLLHUP)
+    internal static let POLLCANCEL: CUnsignedInt = 0xF0000000 // Poll cancelled, need to reregister for singleshot polls
 
     private var ring = io_uring()
     // FIXME: These should be tunable somewhere, somehow. Maybe environment vars are ok, need to discuss with SwiftNIO team.
@@ -143,7 +144,7 @@ final internal class Uring {
     }
 
     static let _sqpollEnabled: Bool = {
-        getEnvironmentVar("IORING_SETUP_SQPOLL") != nil // set this env. var to enable SQPOLL
+        getEnvironmentVar("SWIFTNIO_IORING_SETUP_SQPOLL") != nil // set this env. var to enable SQPOLL
     }()
 
     internal func io_uring_queue_init() throws -> () {
@@ -265,7 +266,7 @@ final internal class Uring {
         }
     }
     
-    internal func io_uring_prep_poll_remove(fd: Int32, pollMask: UInt32, sequenceIdentifier: UInt32, submitNow: Bool = true) -> () {
+    internal func io_uring_prep_poll_remove(fd: Int32, pollMask: UInt32, sequenceIdentifier: UInt32, submitNow: Bool = true, link: Bool = false) -> () {
         let sqe = CNIOLinux_io_uring_get_sqe(&ring)
         let upperQuad : Int = Int(CqeEventType.poll.rawValue) << 24 + (Int(sequenceIdentifier) & 0x00FFFFFF)
         let bitPattern : Int = upperQuad << 32 + Int(fd)
@@ -279,6 +280,10 @@ final internal class Uring {
         CNIOLinux.io_uring_prep_poll_remove(sqe, bitpatternAsPointer)
         CNIOLinux.io_uring_sqe_set_data(sqe, userBitpatternAsPointer) // must be done after prep_poll_add, otherwise zeroed out.
 
+        if link {
+            CNIOLinux_io_uring_set_link_flag(sqe)
+        }
+        
         if submitNow {
             io_uring_flush()
         }
@@ -338,6 +343,13 @@ final internal class Uring {
                             assert(fd >= 0, "fd must be greater than zero")
 
                             let pollError = Uring.POLLERR | Uring.POLLHUP
+                            if let current = fdEvents[fdEventKey(fd, sequenceNumber)] {
+                                fdEvents[fdEventKey(fd, sequenceNumber)] = current | pollError
+                            } else {
+                                fdEvents[fdEventKey(fd, sequenceNumber)] = pollError
+                            }
+                        } else {
+                            let pollError = Uring.POLLCANCEL
                             if let current = fdEvents[fdEventKey(fd, sequenceNumber)] {
                                 fdEvents[fdEventKey(fd, sequenceNumber)] = current | pollError
                             } else {

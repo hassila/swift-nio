@@ -348,7 +348,7 @@ internal class Selector<R: Registration> {
     // writes: `self.externalSelectorFDLock` AND access from the EventLoop thread
     fileprivate var selectorFD: CInt = -1 // -1 == we're closed
     fileprivate let myThread: NIOThread
-    private var currentSelectableSequenceIdentifier : SelectableSequenceIdentifier = 1
+    fileprivate var currentSelectableSequenceIdentifier : SelectableSequenceIdentifier = 1
 
     internal func testsOnly_withUnsafeSelectorFD<T>(_ body: (CInt) throws -> T) throws -> T {
         assert(self.myThread != NIOThread.current)
@@ -989,7 +989,7 @@ final internal class UringSelector<R: Registration>: Selector<R> {
         ring.io_uring_prep_poll_add(fd: Int32(self.eventFD), pollMask: Uring.POLLIN, sequenceIdentifier:0, multishot:false) // wakeups
 
         self.lifecycleState = .open
-        _debugPrint("UringSelector up and running fd [\(self.selectorFD)]")
+        _debugPrint("UringSelector up and running fd [\(self.selectorFD)] wakeups on event_fd [\(self.eventFD)]")
     }
 
     deinit {
@@ -1023,7 +1023,9 @@ final internal class UringSelector<R: Registration>: Selector<R> {
             ring.io_uring_prep_poll_remove(fd: Int32(fd),
                                            pollMask: oldInterested.uringEventSet,
                                            sequenceIdentifier: sequenceIdentifier,
-                                           submitNow:!deferReregistrations)
+                                           submitNow:!deferReregistrations,
+                                           link: true)
+  
             ring.io_uring_prep_poll_add(fd: Int32(fd),
                                         pollMask: newInterested.uringEventSet,
                                         sequenceIdentifier: sequenceIdentifier,
@@ -1050,7 +1052,6 @@ final internal class UringSelector<R: Registration>: Selector<R> {
         }
 // FIXME: Need to verify that SwiftNIO writes until blocking (exhaustive writing)
         return false
-//        return false
     }
 
     /// Apply the given `SelectorStrategy` and execute `body` once it's complete (which may produce `SelectorEvent`s to handle).
@@ -1117,10 +1118,6 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                 if let registration = registrations[Int(event.fd)] {
                     _debugPrint("We found a registration for event.fd [\(event.fd)]") // \(registration)
 
-                    if event.sequenceIdentifier !=  registration.selectableSequenceIdentifier {
-                        _debugPrint("The event.sequenceIdentifier [\(event.sequenceIdentifier)] !=  registration.selectableSequenceIdentifier [\(registration.selectableSequenceIdentifier)], skipping to next event")
-                        continue
-                    }
 
                     var selectorEvent = SelectorEventSet(uringEvent: event.pollMask)
                     // let socketClosing = (event.pollMask & (Uring.POLLRDHUP | Uring.POLLHUP | Uring.POLLERR)) > 0 ? true : false
@@ -1137,14 +1134,23 @@ final internal class UringSelector<R: Registration>: Selector<R> {
 
                     if selectorEvent.contains(.readEOF) {
                        _debugPrint("selectorEvent.contains(.readEOF) [\(selectorEvent.contains(.readEOF))]")
-
                     }
+                    
                     if multishot == false { // must be before guard, otherwise lost wake
                         ring.io_uring_prep_poll_add(fd: event.fd,
                                                     pollMask: registration.interested.uringEventSet,
                                                     sequenceIdentifier: registration.selectableSequenceIdentifier,
                                                     submitNow: false,
                                                     multishot: false)
+
+                        if event.pollMask == Uring.POLLCANCEL {
+                            _debugPrint("Received Uring.POLLCANCEL")
+                        }
+                    }
+
+                    if event.sequenceIdentifier != registration.selectableSequenceIdentifier {
+                        _debugPrint("The event.sequenceIdentifier [\(event.sequenceIdentifier)] !=  registration.selectableSequenceIdentifier [\(registration.selectableSequenceIdentifier)], skipping to next event")
+                        continue
                     }
 
                     guard selectorEvent != ._none else {
@@ -1168,12 +1174,13 @@ final internal class UringSelector<R: Registration>: Selector<R> {
                     try body((SelectorEvent(io: selectorEvent, registration: registration)))
                     
                } else { // remove any polling if we don't have a registration for it
-                    _debugPrint("We had no registration for event.fd [\(event.fd)] event.pollMask [\(event.pollMask)] event.sequenceIdentifier [\(event.sequenceIdentifier)]- should be deregistered already deregistrationsHappened[\(deregistrationsHappened)]")
-/*
-                    ring.io_uring_prep_poll_remove(fd: event.fd,
-                                                   pollMask: event.pollMask,
-                                                   sequenceIdentifier: event.sequenceIdentifier,
-                                                   submitNow: false) */
+                    _debugPrint("We had no registration for event.fd [\(event.fd)] event.pollMask [\(event.pollMask)] event.sequenceIdentifier [\(event.sequenceIdentifier)], it should be deregistered already")
+                    if multishot == false {
+                        ring.io_uring_prep_poll_remove(fd: event.fd,
+                                                       pollMask: event.pollMask,
+                                                       sequenceIdentifier: event.sequenceIdentifier,
+                                                       submitNow: false)
+                    }
                 }
             }
         }
