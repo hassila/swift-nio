@@ -205,7 +205,6 @@ class BaseStreamSocketChannel<Socket: SocketProtocol>: BaseSocketChannel<Socket>
                     self.connectTimeoutScheduled = nil
                     timeout.cancel()
                 }
-                _close0_cleanup(mode:mode)
                 super.close0(error: error, mode: mode, promise: promise)
             }
         } catch let err {
